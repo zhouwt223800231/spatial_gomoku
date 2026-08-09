@@ -1,7 +1,6 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Line } from '@react-three/drei';
 
 interface WinLineProps {
   positions: [number, number, number][];
@@ -22,7 +21,15 @@ export function WinLine({ positions, player }: WinLineProps) {
   });
 
   const color = player === 'black' ? '#fbbf24' : '#60a5fa';
-  const linePoints = positions.map(p => new THREE.Vector3(...p));
+
+  // 用 Three.js 原生 Line 连接走点，避免 Drei <Line>（Line2）的初始化崩溃问题。
+  // 不能用 JSX <line> 标签（会被 TS 当作 SVG line），因此手动构造 THREE.Line 对象。
+  const winLineObject = useMemo(() => {
+    const points = positions.map(p => new THREE.Vector3(...p));
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
+    return new THREE.Line(geo, mat);
+  }, [positions, color]);
 
   return (
     <group ref={groupRef}>
@@ -39,7 +46,7 @@ export function WinLine({ positions, player }: WinLineProps) {
           />
         </mesh>
       ))}
-      <Line points={linePoints} color={color} lineWidth={3} />
+      <primitive object={winLineObject} />
     </group>
   );
 }
