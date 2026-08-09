@@ -46,20 +46,26 @@ export function Board3D() {
     <group ref={groupRef}>
       <mesh>
         <boxGeometry args={[boardSize, boardSize, boardSize]} />
+        {/* 主棋盒材质：避免 transmission（玻璃透射）——它在部分 Intel 集显/Chromium 环境会黑屏。
+            改用普通半透明金属材质模拟玻璃，兼容性远好于 transmission。 */}
         <meshPhysicalMaterial
-          color="#0f172a"
+          color="#1e293b"
           transparent
-          opacity={0.06}
-          roughness={0.05}
-          metalness={0.2}
-          transmission={0.95}
-          thickness={1}
-          clearcoat={1}
+          opacity={0.22}
+          roughness={0.12}
+          metalness={0.55}
+          clearcoat={0.6}
         />
       </mesh>
 
+      {/* 棋盒边框线（让棋盘轮廓在无透射时也清晰可见） */}
+      <lineSegments>
+        <edgesGeometry args={[new THREE.BoxGeometry(boardSize, boardSize, boardSize)]} />
+        <lineBasicMaterial color="#60a5fa" transparent opacity={0.5} />
+      </lineSegments >
+
       <lineSegments geometry={gridGeometry}>
-        <lineBasicMaterial color="#4a5568" transparent opacity={0.22} />
+        <lineBasicMaterial color="#94a3b8" transparent opacity={0.45} />
       </lineSegments>
 
       {Array.from({ length: boardSize }, (_, z) => (
