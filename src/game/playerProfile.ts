@@ -57,7 +57,66 @@ export function updateProfileAfterMove(
     newProfile.spatialPreference.diagonalTendency = lerp(newProfile.spatialPreference.diagonalTendency, 1, 0.05);
   }
 
-  return newProfile;
+  return updateVulnerabilities(newProfile, position, stones, boardSize);
+}
+
+/**
+ * 弱点档案采集：基于玩家移动历史，检测防守薄弱方向。
+ *
+ * 思路：如果玩家的棋子长期集中在低 Z 层（主平面），而对 Z 轴向（纵向）
+ * 或纯对角线方向的协防覆盖少，一旦对手在这些方向展开进攻，就判定为弱点
+ * 并提高 exposureRate。adaptiveAI 会据此调整权重去攻击这些方向。
+ */
+function updateVulnerabilities(
+  profile: PlayerProfile,
+  position: Position,
+  stones: StoneData[],
+  boardSize: BoardSize
+): PlayerProfile {
+  const history = profile.moveHistory;
+  if (history.length < 4) return profile; // 样本不足，暂不判定
+
+  const centerZ = Math.floor((boardSize - 1) / 2);
+  const activePlayer = stones.find(s => s.position.x === position.x && s.position.y === position.y && s.position.z === position.z)?.player ?? 'black';
+  const opponent: 'black' | 'white' = activePlayer === 'black' ? 'white' : 'black';
+
+  // 该玩家历史中偏离中心层的比例（纵向活动度）
+  const offPlane = history.filter(p => p.z !== centerZ).length / history.length;
+
+  // 该玩家历史中使用“纯对角线位置”（x、y、z 两两不等）的比例
+  const diagMoves = history.filter(p =>
+    p.x !== p.y && p.y !== p.z && p.x !== p.z
+  ).length / history.length;
+
+  // 当前棋盘中，对手棋子有多少分布在偏离中心层的纵向层
+  const oppOffPlane = stones.filter(s => s.player === opponent && s.position.z !== centerZ).length;
+
+  // 判定 Z 轴防守弱点：玩家很少离开中心层，而对手已经在纵向布子
+  const zWeak = offPlane < 0.25 && oppOffPlane >= 2;
+  // 判定对角线防守弱点：玩家几乎不用对角位，而对手有对角威胁结构
+  const diagWeak = diagMoves < 0.25;
+
+  const vulnerabilities = [...profile.vulnerabilities];
+
+  applyVulnerability(vulnerabilities, 'Z_AXIS', zWeak ? 0.5 + offPlane : 0.3);
+  applyVulnerability(vulnerabilities, 'DIAGONAL', diagWeak ? 0.5 + (1 - diagMoves) * 0.5 : 0.3);
+
+  return { ...profile, vulnerabilities };
+}
+
+function applyVulnerability(
+  list: PlayerProfile['vulnerabilities'],
+  direction: string,
+  exposureRate: number
+): void {
+  const existing = list.find(v => v.direction === direction);
+  const now = Date.now();
+  if (existing) {
+    existing.exposureRate = lerp(existing.exposureRate, Math.min(1, exposureRate), 0.15);
+    existing.lastExploited = now;
+  } else {
+    list.push({ direction, exposureRate: Math.min(1, exposureRate), lastExploited: now });
+  }
 }
 
 export function updateProfileAfterGame(

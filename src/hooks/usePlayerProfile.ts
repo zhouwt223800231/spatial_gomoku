@@ -3,19 +3,23 @@ import { PlayerProfile, Position, StoneData, BoardSize } from '../types';
 import { loadProfile, saveProfile, updateProfileAfterMove, updateProfileAfterGame, createDefaultProfile } from '../game/playerProfile';
 
 export function usePlayerProfile() {
-  const [profile, setProfile] = useState<PlayerProfile>(loadProfile());
+  const [profile, setProfile] = useState<PlayerProfile>(loadProfile);
 
   const recordMove = useCallback((position: Position, stones: StoneData[], boardSize: BoardSize) => {
-    const updated = updateProfileAfterMove(profile, position, stones, boardSize);
-    setProfile(updated);
-    saveProfile(updated);
-  }, [profile]);
+    setProfile((prev) => {
+      const updated = updateProfileAfterMove(prev, position, stones, boardSize);
+      saveProfile(updated);
+      return updated;
+    });
+  }, []);
 
   const recordGame = useCallback((won: boolean, lost: boolean, moves: number) => {
-    const updated = updateProfileAfterGame(profile, won, lost, moves);
-    setProfile(updated);
-    saveProfile(updated);
-  }, [profile]);
+    setProfile((prev) => {
+      const updated = updateProfileAfterGame(prev, won, lost, moves);
+      saveProfile(updated);
+      return updated;
+    });
+  }, []);
 
   const resetProfile = useCallback(() => {
     const defaultProfile = createDefaultProfile();

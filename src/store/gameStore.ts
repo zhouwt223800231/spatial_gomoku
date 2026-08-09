@@ -94,6 +94,22 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   undoMove: () => set((state) => {
     if (state.stones.length === 0) return state;
+
+    // AI 模式：人类落子后 AI 会立即回一子，因此撤销应回退“一整轮”（两步），
+    // 否则会留下 AI 的棋子且 currentPlayer 错乱。人类执黑先手，撤销后回到黑方回合。
+    if (state.gameMode === 'ai') {
+      const total = state.stones.length;
+      const removeCount = Math.min(2, total);
+      const newStones = state.stones.slice(0, total - removeCount);
+      return {
+        stones: newStones,
+        currentPlayer: 'black' as Player,
+        movesCount: Math.max(0, state.movesCount - 2),
+        lastMove: newStones.length > 0 ? newStones[newStones.length - 1].position : null,
+      };
+    }
+
+    // PVP 模式：照旧只回退一步，并恢复上一步的玩家回合
     const newStones = state.stones.slice(0, -1);
     return {
       stones: newStones,

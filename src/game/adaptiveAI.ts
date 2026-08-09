@@ -1,4 +1,5 @@
-import { PlayerProfile, EvalWeights, DEFAULT_WEIGHTS } from '../types';
+import { PlayerProfile } from '../types';
+import { EvalWeights, DEFAULT_WEIGHTS } from './evaluate';
 
 export function getAdaptiveWeights(profile: PlayerProfile, gameCount: number): { weights: EvalWeights; maxDepth: number; insight: string | null } {
   const weights = { ...DEFAULT_WEIGHTS };
