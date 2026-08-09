@@ -23,7 +23,7 @@ export function Stone({ position, player }: StoneProps) {
   });
 
   return (
-    <mesh ref={meshRef} position={position} scale={0}>
+    <mesh ref={meshRef} position={position} scale={0} raycast={() => null}>
       <sphereGeometry args={[0.38, 32, 32]} />
       <meshPhysicalMaterial
         color={player === 'black' ? '#0a0a0a' : '#f5f5f0'}

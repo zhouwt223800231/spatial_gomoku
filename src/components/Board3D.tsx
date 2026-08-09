@@ -11,25 +11,41 @@ export function Board3D() {
   const groupRef = useRef<THREE.Group>(null);
   const offset = (boardSize - 1) / 2;
 
-  // 使用 Three.js 原生 LineSegments 构建网格线，避免 Drei <Line>（Line2）
-  // 在部分 WebGL/GPU 环境初始化时实例化崩溃（Cannot read properties of undefined）。
-  // 后来发现 lineSegments 的 1px 细线在部分高分屏/驱动下不可见，改用细圆柱（mesh）画线，
-  // 线宽可控且兼容性极好。
+  // 网格线：用细圆柱（mesh）绘制，线宽可控、兼容所有 GPU。
+  // cylinderGeometry 默认沿 Y 轴，因此：
+  //   沿 X 轴 -> 绕 Z 旋转 90°
+  //   沿 Y 轴 -> 不旋转
+  //   沿 Z 轴 -> 绕 X 旋转 90°
   const gridLines = useMemo(() => {
-    const lines: { pos: [number, number, number]; orient: 'x' | 'y' | 'z'; len: number }[] = [];
+    const lines: { pos: [number, number, number]; rot: [number, number, number] }[] = [];
+    const half = boardSize / 2; // 线从 -half 到 +half，比棋盘略长保证端点衔接
     for (let a = 0; a < boardSize; a++) {
       for (let b = 0; b < boardSize; b++) {
         const v = a - offset;
         const w = b - offset;
-        // 沿 X 轴
-        lines.push({ pos: [0, w, v], orient: 'x', len: boardSize });
-        // 沿 Y 轴
-        lines.push({ pos: [v, 0, w], orient: 'y', len: boardSize });
-        // 沿 Z 轴
-        lines.push({ pos: [w, v, 0], orient: 'z', len: boardSize });
+        // 沿 X 轴（Y=w, Z=v 固定）
+        lines.push({ pos: [0, w, v], rot: [0, 0, Math.PI / 2] });
+        // 沿 Y 轴（X=v, Z=w 固定）
+        lines.push({ pos: [v, 0, w], rot: [0, 0, 0] });
+        // 沿 Z 轴（X=w, Y=v 固定）
+        lines.push({ pos: [w, v, 0], rot: [Math.PI / 2, 0, 0] });
       }
     }
-    return lines;
+    return { lines, len: boardSize + 0.02 };
+  }, [boardSize, offset]);
+
+  // 落子点击靶：每个格点一个透明小立方体，点击时 intersection.point 就是格点中心，
+  // App.handleClick 的 Math.round 后即为精确格点坐标。这是"能正常落子"的关键。
+  const hitboxes = useMemo(() => {
+    const boxes: [number, number, number][] = [];
+    for (let x = 0; x < boardSize; x++) {
+      for (let y = 0; y < boardSize; y++) {
+        for (let z = 0; z < boardSize; z++) {
+          boxes.push([x - offset, y - offset, z - offset]);
+        }
+      }
+    }
+    return boxes;
   }, [boardSize, offset]);
 
   useFrame((state) => {
@@ -40,10 +56,9 @@ export function Board3D() {
 
   return (
     <group ref={groupRef}>
-      <mesh>
+      {/* 主棋盒：纯视觉，禁用射线检测，避免挡住点击 */}
+      <mesh raycast={() => null}>
         <boxGeometry args={[boardSize, boardSize, boardSize]} />
-        {/* 主棋盒材质：避免 transmission（玻璃透射）——它在部分 Intel 集显/Chromium 环境会黑屏。
-            改用普通半透明金属材质模拟玻璃，兼容性远好于 transmission。 */}
         <meshPhysicalMaterial
           color="#1e293b"
           transparent
@@ -54,33 +69,36 @@ export function Board3D() {
         />
       </mesh>
 
-      {/* 棋盒边框线（让棋盘轮廓在无透射时也清晰可见） */}
-      <lineSegments>
+      {/* 棋盒边框线（让棋盘轮廓清晰可见） */}
+      <lineSegments raycast={() => null}>
         <edgesGeometry args={[new THREE.BoxGeometry(boardSize, boardSize, boardSize)]} />
         <lineBasicMaterial color="#38bdf8" transparent opacity={0.9} />
-      </lineSegments >
+      </lineSegments>
 
-      {/* 网格线：改用细圆柱 mesh 绘制，线宽可控，兼容所有 GPU（替代 lineSegments 的 1px 细线） */}
-      {gridLines.map((line, idx) => {
-        // 坐标轴向旋转：x 轴向默认(沿X)，y 轴需绕Z旋转90°，z 轴需绕X旋转90°
-        let rot: [number, number, number] = [0, 0, 0];
-        if (line.orient === 'y') rot = [0, 0, Math.PI / 2];
-        else if (line.orient === 'z') rot = [Math.PI / 2, 0, 0];
-        return (
-          <mesh key={`gl-${idx}`} position={line.pos} rotation={rot}>
-            <cylinderGeometry args={[0.03, 0.03, line.len, 6]} />
-            <meshBasicMaterial color="#7dd3fc" transparent opacity={0.9} />
-          </mesh>
-        );
-      })}
+      {/* 网格线：细圆柱，禁用射线检测 */}
+      {gridLines.lines.map((line, idx) => (
+        <mesh key={`gl-${idx}`} position={line.pos} rotation={line.rot} raycast={() => null}>
+          <cylinderGeometry args={[0.03, 0.03, gridLines.len, 6]} />
+          <meshBasicMaterial color="#7dd3fc" transparent opacity={0.9} />
+        </mesh>
+      ))}
 
+      {/* 悬停层高亮：纯视觉，禁用射线检测 */}
       {Array.from({ length: boardSize }, (_, z) => (
         hoveredLayer === z && (
-          <mesh key={`layer-${z}`} position={[0, 0, z - offset]}>
+          <mesh key={`layer-${z}`} position={[0, 0, z - offset]} raycast={() => null}>
             <planeGeometry args={[boardSize - 0.2, boardSize - 0.2]} />
             <meshBasicMaterial color="#60a5fa" transparent opacity={0.04} side={THREE.DoubleSide} />
           </mesh>
         )
+      ))}
+
+      {/* 落子点击靶：每个格点一个透明 hitbox（唯一可点击物体） */}
+      {hitboxes.map((pos, idx) => (
+        <mesh key={`hit-${idx}`} position={pos}>
+          <boxGeometry args={[0.9, 0.9, 0.9]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
       ))}
 
       {stones.map((stone, idx) => (

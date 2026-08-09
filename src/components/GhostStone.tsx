@@ -17,7 +17,7 @@ export function GhostStone({ position }: GhostStoneProps) {
   });
 
   return (
-    <mesh ref={meshRef} position={position}>
+    <mesh ref={meshRef} position={position} raycast={() => null}>
       <sphereGeometry args={[0.38, 32, 32]} />
       <meshPhysicalMaterial
         color="#60a5fa"
