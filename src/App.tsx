@@ -8,6 +8,7 @@ import { usePlayerProfile } from './hooks/usePlayerProfile';
 import { useAudio } from './hooks/useAudio';
 import { Board3D } from './components/Board3D';
 import { CameraController } from './components/CameraController';
+import { WebGLDiagnostic } from './components/WebGLDiagnostic';
 import { Menu } from './components/UI/Menu';
 import { GameHUD } from './components/UI/GameHUD';
 import { AIInsight } from './components/UI/AIInsight';
@@ -89,8 +90,19 @@ export default function App() {
     }
   }, [gamePhase, gameMode, currentPlayer, boardSize, stones, placeStone, playPlaceSound, recordMove]);
 
+  // 声音改为首次用户点击时才初始化，避免“AudioContext was not allowed to start”警告
   useEffect(() => {
-    init();
+    const onFirstGesture = () => {
+      init();
+      window.removeEventListener('pointerdown', onFirstGesture);
+      window.removeEventListener('keydown', onFirstGesture);
+    };
+    window.addEventListener('pointerdown', onFirstGesture);
+    window.addEventListener('keydown', onFirstGesture);
+    return () => {
+      window.removeEventListener('pointerdown', onFirstGesture);
+      window.removeEventListener('keydown', onFirstGesture);
+    };
   }, [init]);
 
   useEffect(() => {
@@ -154,6 +166,7 @@ export default function App() {
 
         <Board3D />
         <CameraController />
+        <WebGLDiagnostic />
       </Canvas>
 
       {gamePhase === 'menu' && <Menu />}
