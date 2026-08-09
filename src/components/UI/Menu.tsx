@@ -12,13 +12,13 @@ export function Menu() {
           Spatial Gomoku
         </h1>
         <p className="text-white/40 text-lg tracking-widest uppercase">
-          三维空间五子棋
+          3D Spatial Gomoku
         </p>
       </div>
 
       <div className="glass-panel p-8 w-80 space-y-6">
         <div className="space-y-3">
-          <label className="text-white/60 text-sm uppercase tracking-wider">棋盘大小</label>
+          <label className="text-white/60 text-sm uppercase tracking-wider">Board Size</label>
           <div className="flex gap-2">
             {[5, 7, 9].map((size) => (
               <button
@@ -41,19 +41,19 @@ export function Menu() {
             onClick={() => { setGameMode('pvp'); startGame(); }}
             className="w-full glass-button text-lg font-light"
           >
-            本地对战
+            Local vs Local
           </button>
           <button
             onClick={() => { setGameMode('ai'); startGame(); }}
             className="w-full glass-button text-lg font-light"
           >
-            AI 挑战
+            AI Challenge
           </button>
         </div>
       </div>
 
       <div className="mt-8 text-white/20 text-xs">
-        <p>鼠标拖拽旋转 · 滚轮缩放 · 悬停预览 · 点击落子</p>
+        <p>Drag to rotate · Scroll to zoom · Hover to preview · Click to place</p>
       </div>
     </div>
   );

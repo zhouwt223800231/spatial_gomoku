@@ -11,12 +11,12 @@ export function AIInsight() {
     <div className="absolute bottom-24 right-6 z-10 w-64">
       <div className="glass-panel p-4">
         <div className="flex justify-between items-center mb-3">
-          <h3 className="text-white/60 text-xs uppercase tracking-wider">AI 洞察</h3>
+          <h3 className="text-white/60 text-xs uppercase tracking-wider">AI Insight</h3>
           <button onClick={() => setVisible(false)} className="text-white/30 hover:text-white/60 text-xs">×</button>
         </div>
         <div className="space-y-2 max-h-40 overflow-y-auto">
           {aiInsights.length === 0 ? (
-            <p className="text-white/20 text-xs">正在观察你的下棋风格...</p>
+            <p className="text-white/20 text-xs">Analyzing your play style...</p>
           ) : (
             aiInsights.slice().reverse().map((insight) => (
               <div key={insight.id} className="text-xs">

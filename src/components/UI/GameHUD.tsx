@@ -12,11 +12,11 @@ export function GameHUD() {
           <div className="flex items-center gap-3 mb-2">
             <div className={`w-3 h-3 rounded-full ${currentPlayer === 'black' ? 'bg-neutral-900 border border-white/30' : 'bg-stone-100'}`} />
             <span className="text-white/80 text-sm uppercase tracking-wider">
-              {currentPlayer === 'black' ? '黑方' : '白方'}
+              {currentPlayer === 'black' ? 'Black' : 'White'}
             </span>
           </div>
           <p className="text-white/40 text-xs">
-            {aiThinking ? 'AI 思考中...' : '轮到你了'}
+            {aiThinking ? 'AI thinking...' : 'Your turn'}
           </p>
         </div>
       </div>
@@ -25,11 +25,11 @@ export function GameHUD() {
       <div className="absolute top-6 right-6 z-10">
         <div className="glass-panel p-4 min-w-[140px] space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-white/40">模式</span>
-            <span className="text-white/80">{gameMode === 'ai' ? 'AI 挑战' : '本地对战'}</span>
+            <span className="text-white/40">Mode</span>
+            <span className="text-white/80">{gameMode === 'ai' ? 'AI' : 'Local'}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-white/40">步数</span>
+            <span className="text-white/40">Moves</span>
             <span className="text-white/80">{movesCount}</span>
           </div>
         </div>
@@ -38,13 +38,13 @@ export function GameHUD() {
       {/* Bottom - Controls */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex gap-3">
         <button onClick={undoMove} disabled={stones.length === 0} className="glass-button text-sm disabled:opacity-30">
-          撤销
+          Undo
         </button>
         <button onClick={resetGame} className="glass-button text-sm">
-          重新开始
+          Restart
         </button>
         <button onClick={() => useGameStore.setState({ gamePhase: 'menu' })} className="glass-button text-sm">
-          返回菜单
+          Main Menu
         </button>
       </div>
     </>

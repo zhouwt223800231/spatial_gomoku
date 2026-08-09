@@ -14,30 +14,30 @@ export function getAdaptiveWeights(profile: PlayerProfile, gameCount: number): {
   } else if (winRate < 0.3) {
     maxDepth = 2;
     weights.ATTACK = 0.8;
-    insight = 'AI降低难度，给你更多练习空间';
+    insight = 'AI lowered difficulty to give you more room to practice';
   }
 
   const zVuln = profile.vulnerabilities.find(v => v.direction === 'Z_AXIS');
   if (zVuln && zVuln.exposureRate > 0.5) {
     weights.Z_AXIS = 50;
-    insight = 'AI发现你Z轴防守薄弱，加强纵向进攻';
+    insight = 'AI detected weak Z-axis defense, strengthening vertical attack';
   }
 
   const diagVuln = profile.vulnerabilities.find(v => v.direction === 'DIAGONAL');
   if (diagVuln && diagVuln.exposureRate > 0.5) {
     weights.DIAGONAL = 30;
-    if (!insight) insight = 'AI针对你的对角线习惯调整策略';
+    if (!insight) insight = 'AI is adjusting strategy to counter your diagonal play';
   }
 
   if (profile.style.aggressiveness > 0.7) {
     weights.DEFENSE = 1.3;
     weights.ATTACK = 0.7;
-    if (!insight) insight = 'AI加强防守应对你的进攻风格';
+    if (!insight) insight = 'AI is strengthening defense against your aggressive style';
   }
 
   if (profile.style.patternConsistency > 0.8 && gameCount > 5) {
     weights.PATTERN_BREAK = 2.0;
-    if (!insight) insight = 'AI识破你的固定模式，准备打破规律';
+    if (!insight) insight = 'AI detected your fixed pattern, preparing to break it';
   }
 
   return { weights, maxDepth, insight };

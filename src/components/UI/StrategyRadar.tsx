@@ -6,9 +6,9 @@ export function StrategyRadar() {
 
   const threats = useMemo(() => {
     const dirs = [
-      { name: 'X轴', key: 'x', dir: { x: 1, y: 0, z: 0 } },
-      { name: 'Y轴', key: 'y', dir: { x: 0, y: 1, z: 0 } },
-      { name: 'Z轴', key: 'z', dir: { x: 0, y: 0, z: 1 } },
+      { name: 'X-Axis', key: 'x', dir: { x: 1, y: 0, z: 0 } },
+      { name: 'Y-Axis', key: 'y', dir: { x: 0, y: 1, z: 0 } },
+      { name: 'Z-Axis', key: 'z', dir: { x: 0, y: 0, z: 1 } },
     ];
 
     return dirs.map(d => {
@@ -38,7 +38,7 @@ export function StrategyRadar() {
   return (
     <div className="absolute top-24 left-6 z-10">
       <div className="glass-panel p-4 w-36">
-        <h3 className="text-white/60 text-xs uppercase tracking-wider mb-3">战略雷达</h3>
+        <h3 className="text-white/60 text-xs uppercase tracking-wider mb-3">Strategy Radar</h3>
         <div className="space-y-3">
           {threats.map(t => (
             <div key={t.key}>

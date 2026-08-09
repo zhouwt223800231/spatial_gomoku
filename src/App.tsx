@@ -183,11 +183,11 @@ export default function App() {
         <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/40 backdrop-blur-sm">
           <div className="text-center">
             <h2 className={`text-5xl font-light mb-4 ${winner === 'black' ? 'text-amber-400' : 'text-blue-400'}`}>
-              {winner === 'black' ? '黑方胜利' : '白方胜利'}
+              {winner === 'black' ? 'Black Wins' : 'White Wins'}
             </h2>
-            <p className="text-white/40 mb-8">空间五连达成</p>
+            <p className="text-white/40 mb-8">Five in a row in 3D space!</p>
             <button onClick={() => useGameStore.getState().resetGame()} className="glass-button">
-              再来一局
+              Play Again
             </button>
           </div>
         </div>
@@ -196,10 +196,10 @@ export default function App() {
       {gamePhase === 'draw' && (
         <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/40 backdrop-blur-sm">
           <div className="text-center">
-            <h2 className="text-5xl font-light text-white/60 mb-4">平局</h2>
-            <p className="text-white/40 mb-8">棋盘已满</p>
+            <h2 className="text-5xl font-light text-white/60 mb-4">Draw</h2>
+            <p className="text-white/40 mb-8">Board is full</p>
             <button onClick={() => useGameStore.getState().resetGame()} className="glass-button">
-              再来一局
+              Play Again
             </button>
           </div>
         </div>
