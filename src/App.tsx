@@ -41,6 +41,8 @@ export default function App() {
     if (gamePhase !== 'playing') return;
     if (gameMode === 'ai' && currentPlayer === 'white') return;
 
+    // 保护：部分环境 e.intersections 可能为 undefined
+    if (!e || !e.intersections || e.intersections.length === 0) return;
     const intersection = e.intersections[0];
     if (!intersection) return;
 
@@ -65,6 +67,8 @@ export default function App() {
     if (gamePhase !== 'playing') return;
     if (gameMode === 'ai' && currentPlayer === 'white') return;
 
+    // 保护：部分环境 e.intersections 可能为 undefined
+    if (!e || !e.intersections || e.intersections.length === 0) return;
     const intersection = e.intersections[0];
     if (!intersection) return;
 
