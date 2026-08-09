@@ -61,11 +61,12 @@ export function Board3D() {
       {/* 棋盒边框线（让棋盘轮廓在无透射时也清晰可见） */}
       <lineSegments>
         <edgesGeometry args={[new THREE.BoxGeometry(boardSize, boardSize, boardSize)]} />
-        <lineBasicMaterial color="#60a5fa" transparent opacity={0.5} />
+        <lineBasicMaterial color="#38bdf8" transparent opacity={0.9} />
       </lineSegments >
 
+      {/* 网格线：改用明亮高对比色 + 高透明度，避免低分辨率下细线不可见 */}
       <lineSegments geometry={gridGeometry}>
-        <lineBasicMaterial color="#94a3b8" transparent opacity={0.45} />
+        <lineBasicMaterial color="#7dd3fc" transparent opacity={0.85} />
       </lineSegments>
 
       {Array.from({ length: boardSize }, (_, z) => (
