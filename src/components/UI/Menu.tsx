@@ -6,7 +6,7 @@ export function Menu() {
   const { setGameMode, startGame, setBoardSize, boardSize } = useGameStore();
 
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-black/60 backdrop-blur-sm">
+    <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-[#070b16]/60 backdrop-blur-sm">
       <div className="text-center mb-12">
         <h1 className="text-6xl font-light tracking-wider text-white mb-2">
           Spatial Gomoku
@@ -52,8 +52,10 @@ export function Menu() {
         </div>
       </div>
 
-      <div className="mt-8 text-white/20 text-xs">
-        <p>Drag to rotate · Scroll to zoom · Hover to preview · Click to place</p>
+      <div className="mt-8 text-white/25 text-xs text-center leading-relaxed">
+        <p>Left-drag: rotate · Wheel: zoom</p>
+        <p>Right-click: aim · WASD / arrows: fine move</p>
+        <p>Double right-click / Enter: place · Esc: cancel</p>
       </div>
     </div>
   );

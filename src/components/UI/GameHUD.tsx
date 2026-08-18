@@ -2,7 +2,7 @@ import React from 'react';
 import { useGameStore } from '../../store/gameStore';
 
 export function GameHUD() {
-  const { currentPlayer, movesCount, gameMode, aiThinking, resetGame, undoMove, stones } = useGameStore();
+  const { currentPlayer, movesCount, gameMode, aiThinking, resetGame, undoMove, stones, activeLayer, boardSize, setActiveLayer } = useGameStore();
 
   return (
     <>
@@ -21,9 +21,9 @@ export function GameHUD() {
         </div>
       </div>
 
-      {/* Top Right - Game Info */}
+      {/* Top Right - Game Info + Layer */}
       <div className="absolute top-6 right-6 z-10">
-        <div className="glass-panel p-4 min-w-[140px] space-y-2">
+        <div className="glass-panel p-4 min-w-[170px] space-y-3">
           <div className="flex justify-between text-sm">
             <span className="text-white/40">Mode</span>
             <span className="text-white/80">{gameMode === 'ai' ? 'AI' : 'Local'}</span>
@@ -31,6 +31,19 @@ export function GameHUD() {
           <div className="flex justify-between text-sm">
             <span className="text-white/40">Moves</span>
             <span className="text-white/80">{movesCount}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <button
+              onClick={() => setActiveLayer(Math.max(0, activeLayer - 1))}
+              disabled={activeLayer === 0}
+              className="glass-button px-2 py-1 text-xs disabled:opacity-30"
+            >&#9664;</button>
+            <span className="text-white/80 whitespace-nowrap">Layer {activeLayer + 1}/{boardSize}</span>
+            <button
+              onClick={() => setActiveLayer(Math.min(boardSize - 1, activeLayer + 1))}
+              disabled={activeLayer === boardSize - 1}
+              className="glass-button px-2 py-1 text-xs disabled:opacity-30"
+            >&#9654;</button>
           </div>
         </div>
       </div>

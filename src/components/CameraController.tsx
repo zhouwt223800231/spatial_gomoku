@@ -17,7 +17,9 @@ export function CameraController() {
 
   useEffect(() => {
     const controls = new OrbitControlsImpl(camera, gl.domElement);
-    controls.enablePan = true;
+    // Left-drag rotates, wheel zooms. Right-button pan is disabled so the
+    // right button stays free for stone placement.
+    controls.enablePan = false;
     controls.enableZoom = true;
     controls.enableRotate = true;
     controls.minDistance = 3;
@@ -32,7 +34,6 @@ export function CameraController() {
     };
   }, [camera, gl, gamePhase]);
 
-  // OrbitControls 原生版必须每帧调用 update() 才能响应交互并驱动 autoRotate
   useFrame(() => {
     controlsRef.current?.update();
   });

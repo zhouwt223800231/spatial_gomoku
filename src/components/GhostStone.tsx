@@ -4,9 +4,10 @@ import * as THREE from 'three';
 
 interface GhostStoneProps {
   position: [number, number, number];
+  blocked?: boolean;
 }
 
-export function GhostStone({ position }: GhostStoneProps) {
+export function GhostStone({ position, blocked = false }: GhostStoneProps) {
   const meshRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
@@ -16,17 +17,20 @@ export function GhostStone({ position }: GhostStoneProps) {
     }
   });
 
+  const color = blocked ? '#f87171' : '#60a5fa';
+  const emissive = blocked ? '#ef4444' : '#3b82f6';
+
   return (
     <mesh ref={meshRef} position={position} raycast={() => null}>
       <sphereGeometry args={[0.38, 32, 32]} />
       <meshPhysicalMaterial
-        color="#60a5fa"
+        color={color}
         transparent
-        opacity={0.4}
+        opacity={blocked ? 0.55 : 0.4}
         roughness={0.2}
         metalness={0.1}
-        emissive="#3b82f6"
-        emissiveIntensity={0.3}
+        emissive={emissive}
+        emissiveIntensity={0.35}
       />
     </mesh>
   );

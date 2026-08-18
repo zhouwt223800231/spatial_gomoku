@@ -10,10 +10,24 @@ import { useAudio } from './hooks/useAudio';
 import { Board3D } from './components/Board3D';
 import { CameraController } from './components/CameraController';
 import { WebGLDiagnostic } from './components/WebGLDiagnostic';
+import { Starfield } from './components/Starfield';
 import { Menu } from './components/UI/Menu';
 import { GameHUD } from './components/UI/GameHUD';
 import { AIInsight } from './components/UI/AIInsight';
 import { StrategyRadar } from './components/UI/StrategyRadar';
+
+const KEYMAP: Record<'up' | 'down' | 'left' | 'right' | 'layerUp' | 'layerDown' | 'confirm' | 'cancel', readonly string[]> = {
+  up: ['w'],
+  down: ['s'],
+  left: ['a', 'arrowleft'],
+  right: ['d', 'arrowright'],
+  layerUp: ['arrowup'],
+  layerDown: ['arrowdown'],
+  confirm: ['enter', ' '],
+  cancel: ['escape'],
+};
+
+const DOUBLE_CLICK_MS = 350;
 
 export default function App() {
   const {
@@ -24,7 +38,7 @@ export default function App() {
     gameMode,
     placeStone,
     setGhostPosition,
-    setHoveredLayer,
+    setActiveLayer,
     setWinLine,
     setGamePhase,
     setWinner,
@@ -37,38 +51,82 @@ export default function App() {
   const { profile, recordMove, recordGame } = usePlayerProfile();
   const { init, playPlaceSound, playWinSound } = useAudio();
   const aiTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const fineModeRef = useRef(false);
+  const lastLockTimeRef = useRef(0);
 
-  // 悬停：只在可交互回合响应，占用格不显示 ghost
-  const handleCellHover = useCallback((pos: Position) => {
-    if (gamePhase !== 'playing') return;
-    if (gameMode === 'ai' && currentPlayer === 'white') return;
-    const occupied = stones.some(s => s.position.x === pos.x && s.position.y === pos.y && s.position.z === pos.z);
-    if (!occupied) {
-      setGhostPosition(pos);
-      setHoveredLayer(pos.z);
+  const confirmPlace = useCallback(() => {
+    const st = useGameStore.getState();
+    if (st.gamePhase !== 'playing') return;
+    if (st.gameMode === 'ai' && st.currentPlayer === 'white') return;
+    const pos = st.ghostPosition;
+    if (!pos) return;
+    const occupied = st.stones.some(s => s.position.x === pos.x && s.position.y === pos.y && s.position.z === pos.z);
+    if (occupied) return;
+    st.placeStone(pos);
+    playPlaceSound(pos.z);
+    recordMove(pos, [...st.stones, { position: pos, player: st.currentPlayer }], st.boardSize);
+    st.setGhostPosition(null);
+    fineModeRef.current = false;
+  }, [playPlaceSound, recordMove]);
+
+  const handleCellLock = useCallback((pos: Position) => {
+    const st = useGameStore.getState();
+    if (st.gamePhase !== 'playing') return;
+    if (st.gameMode === 'ai' && st.currentPlayer === 'white') return;
+    const now = performance.now();
+    const prev = st.ghostPosition;
+    if (prev && fineModeRef.current && now - lastLockTimeRef.current < DOUBLE_CLICK_MS) {
+      confirmPlace();
     } else {
-      setGhostPosition(null);
+      st.setGhostPosition(pos);
+      st.setActiveLayer(pos.z);
+      fineModeRef.current = true;
+      lastLockTimeRef.current = now;
     }
-  }, [gamePhase, gameMode, currentPlayer, stones, setGhostPosition, setHoveredLayer]);
+  }, [confirmPlace]);
 
-  const handleCellLeave = useCallback(() => {
-    setGhostPosition(null);
-    setHoveredLayer(null);
-  }, [setGhostPosition, setHoveredLayer]);
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const st = useGameStore.getState();
+      if (st.gamePhase !== 'playing') return;
+      if (st.gameMode === 'ai' && st.currentPlayer === 'white') return;
 
-  // 点击：确认落子（格点坐标直接来自 hitbox）
-  const handleCellClick = useCallback((pos: Position) => {
-    if (gamePhase !== 'playing') return;
-    if (gameMode === 'ai' && currentPlayer === 'white') return;
-    const occupied = stones.some(s => s.position.x === pos.x && s.position.y === pos.y && s.position.z === pos.z);
-    if (!occupied) {
-      placeStone(pos);
-      playPlaceSound(pos.z);
-      recordMove(pos, [...stones, { position: pos, player: currentPlayer }], boardSize);
-    }
-  }, [gamePhase, gameMode, currentPlayer, boardSize, stones, placeStone, playPlaceSound, recordMove]);
+      const key = e.key.toLowerCase();
+      const size = st.boardSize;
+      const clamp = (v: number) => Math.max(0, Math.min(size - 1, v));
 
-  // 声音改为首次用户点击时才初始化，避免“AudioContext was not allowed to start”警告
+      const nudge = (dx: number, dy: number, dz: number) => {
+        const cur = st.ghostPosition;
+        if (!cur) return;
+        const pos = { x: clamp(cur.x + dx), y: clamp(cur.y + dy), z: clamp(cur.z + dz) };
+        st.setGhostPosition(pos);
+        st.setActiveLayer(pos.z);
+      };
+
+      const changeLayer = (dz: number) => {
+        const cur = st.ghostPosition;
+        if (cur) {
+          const pos = { x: cur.x, y: cur.y, z: clamp(cur.z + dz) };
+          st.setGhostPosition(pos);
+          st.setActiveLayer(pos.z);
+        } else {
+          st.setActiveLayer(clamp(st.activeLayer + dz));
+        }
+      };
+
+      if (KEYMAP.up.includes(key)) { nudge(0, 1, 0); e.preventDefault(); }
+      else if (KEYMAP.down.includes(key)) { nudge(0, -1, 0); e.preventDefault(); }
+      else if (KEYMAP.left.includes(key)) { nudge(-1, 0, 0); e.preventDefault(); }
+      else if (KEYMAP.right.includes(key)) { nudge(1, 0, 0); e.preventDefault(); }
+      else if (KEYMAP.layerUp.includes(key)) { changeLayer(1); e.preventDefault(); }
+      else if (KEYMAP.layerDown.includes(key)) { changeLayer(-1); e.preventDefault(); }
+      else if (KEYMAP.confirm.includes(key)) { e.preventDefault(); confirmPlace(); }
+      else if (KEYMAP.cancel.includes(key)) { e.preventDefault(); st.setGhostPosition(null); fineModeRef.current = false; }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [confirmPlace]);
+
   useEffect(() => {
     const onFirstGesture = () => {
       init();
@@ -131,20 +189,19 @@ export default function App() {
   const winner = useGameStore.getState().winner;
 
   return (
-    <div className="w-screen h-screen bg-black relative">
+    <div className="w-screen h-screen relative space-bg" onContextMenu={(e) => e.preventDefault()}>
       <Canvas
         camera={{ position: [5, 5, 5], fov: 45 }}
-        style={{ background: '#000000' }}
+        gl={{ alpha: true, antialias: true }}
       >
-        <ambientLight intensity={0.3} />
-        <directionalLight position={[5, 5, 5]} intensity={0.5} />
-        <pointLight position={[-5, -5, -5]} intensity={0.2} color="#3b82f6" />
+        <fog attach="fog" args={['#0b1020', 10, 30]} />
+        <ambientLight intensity={0.45} />
+        <hemisphereLight args={['#67e8f9', '#1e293b', 0.35]} />
+        <directionalLight position={[5, 5, 5]} intensity={0.6} />
+        <pointLight position={[-5, -5, -5]} intensity={0.25} color="#3b82f6" />
 
-        <Board3D
-          onCellHover={handleCellHover}
-          onCellLeave={handleCellLeave}
-          onCellClick={handleCellClick}
-        />
+        <Starfield />
+        <Board3D onCellLock={handleCellLock} />
         <CameraController />
         <WebGLDiagnostic />
       </Canvas>
@@ -160,7 +217,7 @@ export default function App() {
       )}
 
       {gamePhase === 'won' && (
-        <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/40 backdrop-blur-sm">
+        <div className="absolute inset-0 flex items-center justify-center z-20 bg-[#070b16]/40 backdrop-blur-sm">
           <div className="text-center">
             <h2 className={`text-5xl font-light mb-4 ${winner === 'black' ? 'text-amber-400' : 'text-blue-400'}`}>
               {winner === 'black' ? 'Black Wins' : 'White Wins'}
@@ -174,7 +231,7 @@ export default function App() {
       )}
 
       {gamePhase === 'draw' && (
-        <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/40 backdrop-blur-sm">
+        <div className="absolute inset-0 flex items-center justify-center z-20 bg-[#070b16]/40 backdrop-blur-sm">
           <div className="text-center">
             <h2 className="text-5xl font-light text-white/60 mb-4">Draw</h2>
             <p className="text-white/40 mb-8">Board is full</p>
