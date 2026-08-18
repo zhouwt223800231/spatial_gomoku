@@ -1,61 +1,63 @@
-import React, { useRef, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
+import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { useGameStore } from '../store/gameStore';
+import { Position } from '../types';
 import { Stone } from './Stone';
 import { GhostStone } from './GhostStone';
 import { WinLine } from './WinLine';
 
-export function Board3D() {
+interface Board3DProps {
+  onCellHover?: (pos: Position) => void;
+  onCellLeave?: () => void;
+  onCellClick?: (pos: Position) => void;
+}
+
+// 重要：本组件不再对棋盘做任何自动旋转。旋转会导致：
+//  1) 网格线视觉参差；
+//  2) 点击靶(hitbox)的世界坐标 ≠ 格点坐标，落子算错格子。
+// 视角旋转交给 CameraController（OrbitControls 只转相机不转棋盘）。
+export function Board3D({ onCellHover, onCellLeave, onCellClick }: Board3DProps) {
   const { stones, boardSize, ghostPosition, winLine, hoveredLayer } = useGameStore();
-  const groupRef = useRef<THREE.Group>(null);
   const offset = (boardSize - 1) / 2;
 
-  // 网格线：用细圆柱（mesh）绘制，线宽可控、兼容所有 GPU。
-  // cylinderGeometry 默认沿 Y 轴，因此：
-  //   沿 X 轴 -> 绕 Z 旋转 90°
-  //   沿 Y 轴 -> 不旋转
-  //   沿 Z 轴 -> 绕 X 旋转 90°
-  const gridLines = useMemo(() => {
-    const lines: { pos: [number, number, number]; rot: [number, number, number] }[] = [];
-    const half = boardSize / 2; // 线从 -half 到 +half，比棋盘略长保证端点衔接
+  // 内部网格线：精确构造 lineSegments 的 BufferGeometry。
+  // 与边框同样的 lineSegments 渲染方式（你的环境已验证能正常显示），仅换亮色高对比。
+  const gridGeometry = useMemo(() => {
+    const positions: number[] = [];
+    const lineLen = boardSize - 1; // 格点间距为 1，线覆盖从 -offset 到 +offset
     for (let a = 0; a < boardSize; a++) {
       for (let b = 0; b < boardSize; b++) {
-        const v = a - offset;
+        const v = a - offset; // ∈ [-2..2] 整数
         const w = b - offset;
-        // 沿 X 轴（Y=w, Z=v 固定）
-        lines.push({ pos: [0, w, v], rot: [0, 0, Math.PI / 2] });
-        // 沿 Y 轴（X=v, Z=w 固定）
-        lines.push({ pos: [v, 0, w], rot: [0, 0, 0] });
-        // 沿 Z 轴（X=w, Y=v 固定）
-        lines.push({ pos: [w, v, 0], rot: [Math.PI / 2, 0, 0] });
+        // 沿 X 轴：每个 (Y=w, Z=v) 固定，从 -offset 到 +offset
+        positions.push(-offset, w, v, offset, w, v);
+        // 沿 Y 轴：每个 (X=v, Z=w) 固定
+        positions.push(v, -offset, w, v, offset, w);
+        // 沿 Z 轴：每个 (X=w, Y=v) 固定
+        positions.push(w, v, -offset, w, v, offset);
       }
     }
-    return { lines, len: boardSize + 0.02 };
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    return geo;
   }, [boardSize, offset]);
 
-  // 落子点击靶：每个格点一个透明小立方体，点击时 intersection.point 就是格点中心，
-  // App.handleClick 的 Math.round 后即为精确格点坐标。这是"能正常落子"的关键。
+  // 落子点击靶：每个格点一个透明小立方体，直接持有格点坐标 (grid space)。
+  // 事件挂在 mesh 上（R3F 网格事件），因此无需再用 intersection.point 反算格点。
   const hitboxes = useMemo(() => {
-    const boxes: [number, number, number][] = [];
+    const boxes: Position[] = [];
     for (let x = 0; x < boardSize; x++) {
       for (let y = 0; y < boardSize; y++) {
         for (let z = 0; z < boardSize; z++) {
-          boxes.push([x - offset, y - offset, z - offset]);
+          boxes.push({ x, y, z });
         }
       }
     }
     return boxes;
-  }, [boardSize, offset]);
-
-  useFrame((state) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.05) * 0.02;
-    }
-  });
+  }, [boardSize]);
 
   return (
-    <group ref={groupRef}>
+    <group>
       {/* 主棋盒：纯视觉，禁用射线检测，避免挡住点击 */}
       <mesh raycast={() => null}>
         <boxGeometry args={[boardSize, boardSize, boardSize]} />
@@ -75,13 +77,10 @@ export function Board3D() {
         <lineBasicMaterial color="#38bdf8" transparent opacity={0.9} />
       </lineSegments>
 
-      {/* 网格线：细圆柱，禁用射线检测 */}
-      {gridLines.lines.map((line, idx) => (
-        <mesh key={`gl-${idx}`} position={line.pos} rotation={line.rot} raycast={() => null}>
-          <cylinderGeometry args={[0.03, 0.03, gridLines.len, 6]} />
-          <meshBasicMaterial color="#7dd3fc" transparent opacity={0.9} />
-        </mesh>
-      ))}
+      {/* 内部网格线：与边框相同渲染方式，亮色高对比 */}
+      <lineSegments geometry={gridGeometry} raycast={() => null}>
+        <lineBasicMaterial color="#7dd3fc" transparent opacity={0.9} />
+      </lineSegments>
 
       {/* 悬停层高亮：纯视觉，禁用射线检测 */}
       {Array.from({ length: boardSize }, (_, z) => (
@@ -93,9 +92,16 @@ export function Board3D() {
         )
       ))}
 
-      {/* 落子点击靶：每个格点一个透明 hitbox（唯一可点击物体） */}
+      {/* 落子点击靶：每个格点一个透明 hitbox（唯一可点击物体）。
+          通过 R3F 网格事件上报悬停 / 离开 / 点击，App 侧据此落子。 */}
       {hitboxes.map((pos, idx) => (
-        <mesh key={`hit-${idx}`} position={pos}>
+        <mesh
+          key={`hit-${idx}`}
+          position={[pos.x - offset, pos.y - offset, pos.z - offset]}
+          onClick={(e) => { e.stopPropagation(); onCellClick?.(pos); }}
+          onPointerMove={(e) => { e.stopPropagation(); onCellHover?.(pos); }}
+          onPointerOut={() => onCellLeave?.()}
+        >
           <boxGeometry args={[0.9, 0.9, 0.9]} />
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>

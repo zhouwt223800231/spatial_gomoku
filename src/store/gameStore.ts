@@ -54,10 +54,13 @@ export const useGameStore = create<GameState>((set, get) => ({
   setBoardSize: (size) => set({ boardSize: size }),
   setGameMode: (mode) => set({ gameMode: mode }),
 
-  startGame: () => set({
+  startGame: () => set((state) => ({
     ...createInitialState(),
+    // 保留玩家已选择的模式与棋盘尺寸，避免把 AI 模式重置回 PvP
+    gameMode: state.gameMode,
+    boardSize: state.boardSize,
     gamePhase: 'playing',
-  }),
+  })),
 
   placeStone: (position) => {
     const state = get();

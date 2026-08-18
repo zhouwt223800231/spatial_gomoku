@@ -25,6 +25,12 @@
 - Tailwind CSS
 - Tone.js（音效）
 
+## 在线 Demo
+
+<https://zhouwt223800231.github.io/spatial_gomoku/>
+
+> 推送 main 分支后由 GitHub Actions 自动构建并部署到 GitHub Pages（见 .github/workflows/deploy.yml）。
+
 ## 快速开始
 
 ```bash

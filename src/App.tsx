@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { useGameStore } from './store/gameStore';
+import { Position } from './types';
 import { checkWin, isDraw } from './game/rules';
 import { findBestMove } from './game/ai';
 import { getAdaptiveWeights } from './game/adaptiveAI';
@@ -13,7 +14,6 @@ import { Menu } from './components/UI/Menu';
 import { GameHUD } from './components/UI/GameHUD';
 import { AIInsight } from './components/UI/AIInsight';
 import { StrategyRadar } from './components/UI/StrategyRadar';
-import * as THREE from 'three';
 
 export default function App() {
   const {
@@ -38,55 +38,33 @@ export default function App() {
   const { init, playPlaceSound, playWinSound } = useAudio();
   const aiTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const handlePointerMove = useCallback((e: any) => {
+  // 悬停：只在可交互回合响应，占用格不显示 ghost
+  const handleCellHover = useCallback((pos: Position) => {
     if (gamePhase !== 'playing') return;
     if (gameMode === 'ai' && currentPlayer === 'white') return;
-
-    // 保护：部分环境 e.intersections 可能为 undefined
-    if (!e || !e.intersections || e.intersections.length === 0) return;
-    const intersection = e.intersections[0];
-    if (!intersection) return;
-
-    const point = intersection.point;
-    const offset = (boardSize - 1) / 2;
-    const x = Math.round(point.x + offset);
-    const y = Math.round(point.y + offset);
-    const z = Math.round(point.z + offset);
-
-    if (x >= 0 && x < boardSize && y >= 0 && y < boardSize && z >= 0 && z < boardSize) {
-      const occupied = stones.find(s => s.position.x === x && s.position.y === y && s.position.z === z);
-      if (!occupied) {
-        setGhostPosition({ x, y, z });
-        setHoveredLayer(z);
-      } else {
-        setGhostPosition(null);
-      }
+    const occupied = stones.some(s => s.position.x === pos.x && s.position.y === pos.y && s.position.z === pos.z);
+    if (!occupied) {
+      setGhostPosition(pos);
+      setHoveredLayer(pos.z);
+    } else {
+      setGhostPosition(null);
     }
-  }, [gamePhase, gameMode, currentPlayer, boardSize, stones, setGhostPosition, setHoveredLayer]);
+  }, [gamePhase, gameMode, currentPlayer, stones, setGhostPosition, setHoveredLayer]);
 
-  const handleClick = useCallback((e: any) => {
+  const handleCellLeave = useCallback(() => {
+    setGhostPosition(null);
+    setHoveredLayer(null);
+  }, [setGhostPosition, setHoveredLayer]);
+
+  // 点击：确认落子（格点坐标直接来自 hitbox）
+  const handleCellClick = useCallback((pos: Position) => {
     if (gamePhase !== 'playing') return;
     if (gameMode === 'ai' && currentPlayer === 'white') return;
-
-    // 保护：部分环境 e.intersections 可能为 undefined
-    if (!e || !e.intersections || e.intersections.length === 0) return;
-    const intersection = e.intersections[0];
-    if (!intersection) return;
-
-    const point = intersection.point;
-    const offset = (boardSize - 1) / 2;
-    const x = Math.round(point.x + offset);
-    const y = Math.round(point.y + offset);
-    const z = Math.round(point.z + offset);
-
-    if (x >= 0 && x < boardSize && y >= 0 && y < boardSize && z >= 0 && z < boardSize) {
-      const occupied = stones.find(s => s.position.x === x && s.position.y === y && s.position.z === z);
-      if (!occupied) {
-        const pos = { x, y, z };
-        placeStone(pos);
-        playPlaceSound(z);
-        recordMove(pos, [...stones, { position: pos, player: currentPlayer }], boardSize);
-      }
+    const occupied = stones.some(s => s.position.x === pos.x && s.position.y === pos.y && s.position.z === pos.z);
+    if (!occupied) {
+      placeStone(pos);
+      playPlaceSound(pos.z);
+      recordMove(pos, [...stones, { position: pos, player: currentPlayer }], boardSize);
     }
   }, [gamePhase, gameMode, currentPlayer, boardSize, stones, placeStone, playPlaceSound, recordMove]);
 
@@ -156,15 +134,17 @@ export default function App() {
     <div className="w-screen h-screen bg-black relative">
       <Canvas
         camera={{ position: [5, 5, 5], fov: 45 }}
-        onPointerMove={handlePointerMove}
-        onClick={handleClick}
         style={{ background: '#000000' }}
       >
         <ambientLight intensity={0.3} />
         <directionalLight position={[5, 5, 5]} intensity={0.5} />
         <pointLight position={[-5, -5, -5]} intensity={0.2} color="#3b82f6" />
 
-        <Board3D />
+        <Board3D
+          onCellHover={handleCellHover}
+          onCellLeave={handleCellLeave}
+          onCellClick={handleCellClick}
+        />
         <CameraController />
         <WebGLDiagnostic />
       </Canvas>
