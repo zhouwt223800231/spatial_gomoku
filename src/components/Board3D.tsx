@@ -8,11 +8,12 @@ import { WinLine } from './WinLine';
 
 interface Board3DProps {
   onCellLock?: (pos: Position) => void;
+  onCellPlace?: (pos: Position) => void;
 }
 
 const clampCell = (v: number, max: number) => Math.max(0, Math.min(max, v));
 
-export function Board3D({ onCellLock }: Board3DProps) {
+export function Board3D({ onCellLock, onCellPlace }: Board3DProps) {
   const { stones, boardSize, ghostPosition, winLine, activeLayer } = useGameStore();
   const [cursorCell, setCursorCell] = useState<Position | null>(null);
   const offset = (boardSize - 1) / 2;
@@ -95,6 +96,7 @@ export function Board3D({ onCellLock }: Board3DProps) {
         onPointerMove={(e) => { e.stopPropagation(); setCursorCell(pointToCell(e.point)); }}
         onPointerOut={() => setCursorCell(null)}
         onContextMenu={(e) => { e.stopPropagation(); onCellLock?.(pointToCell(e.point)); }}
+        onClick={(e) => { e.stopPropagation(); onCellPlace?.(pointToCell(e.point)); }}
       >
         <planeGeometry args={[boardSize, boardSize]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />

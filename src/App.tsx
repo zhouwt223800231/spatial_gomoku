@@ -54,12 +54,10 @@ export default function App() {
   const fineModeRef = useRef(false);
   const lastLockTimeRef = useRef(0);
 
-  const confirmPlace = useCallback(() => {
+  const placeAt = useCallback((pos: Position) => {
     const st = useGameStore.getState();
     if (st.gamePhase !== 'playing') return;
     if (st.gameMode === 'ai' && st.currentPlayer === 'white') return;
-    const pos = st.ghostPosition;
-    if (!pos) return;
     const occupied = st.stones.some(s => s.position.x === pos.x && s.position.y === pos.y && s.position.z === pos.z);
     if (occupied) return;
     st.placeStone(pos);
@@ -68,6 +66,15 @@ export default function App() {
     st.setGhostPosition(null);
     fineModeRef.current = false;
   }, [playPlaceSound, recordMove]);
+
+  const confirmPlace = useCallback(() => {
+    const pos = useGameStore.getState().ghostPosition;
+    if (pos) placeAt(pos);
+  }, [placeAt]);
+
+  const handleCellPlace = useCallback((pos: Position) => {
+    placeAt(pos);
+  }, [placeAt]);
 
   const handleCellLock = useCallback((pos: Position) => {
     const st = useGameStore.getState();
@@ -201,7 +208,7 @@ export default function App() {
         <pointLight position={[-5, -5, -5]} intensity={0.25} color="#3b82f6" />
 
         <Starfield />
-        <Board3D onCellLock={handleCellLock} />
+        <Board3D onCellLock={handleCellLock} onCellPlace={handleCellPlace} />
         <CameraController />
         <WebGLDiagnostic />
       </Canvas>

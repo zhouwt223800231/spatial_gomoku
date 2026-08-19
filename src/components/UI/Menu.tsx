@@ -53,9 +53,9 @@ export function Menu() {
       </div>
 
       <div className="mt-8 text-white/25 text-xs text-center leading-relaxed">
-        <p>Left-drag: rotate · Wheel: zoom</p>
-        <p>Right-click: aim · WASD / arrows: fine move</p>
-        <p>Double right-click / Enter: place · Esc: cancel</p>
+        <p>Click: place · Drag: rotate · Wheel: zoom</p>
+        <p>Up / Down: layer · WASD / arrows: fine move</p>
+        <p>Right-click: aim · Enter / Space: place · Esc: cancel</p>
       </div>
     </div>
   );
