@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { Position, Player, StoneData, GameMode, GamePhase, WinLineData, BoardSize, AIInsight } from '../types';
 
+export type SliceAxis = 'x' | 'y' | 'z';
+
 interface GameState {
   boardSize: BoardSize;
   stones: StoneData[];
@@ -11,6 +13,7 @@ interface GameState {
   winLine: WinLineData | null;
   ghostPosition: Position | null;
   activeLayer: number;
+  sliceAxis: SliceAxis;
   aiThinking: boolean;
   aiInsights: AIInsight[];
   movesCount: number;
@@ -22,6 +25,7 @@ interface GameState {
   placeStone: (position: Position) => void;
   setGhostPosition: (pos: Position | null) => void;
   setActiveLayer: (layer: number) => void;
+  setSliceAxis: (axis: SliceAxis) => void;
   setWinLine: (line: WinLineData | null) => void;
   setGamePhase: (phase: GamePhase) => void;
   setWinner: (winner: Player | null) => void;
@@ -44,6 +48,7 @@ const createInitialState = () => ({
   winLine: null as WinLineData | null,
   ghostPosition: null as Position | null,
   activeLayer: 2,
+  sliceAxis: 'z' as SliceAxis,
   aiThinking: false,
   aiInsights: [] as AIInsight[],
   movesCount: 0,
@@ -84,6 +89,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   setGhostPosition: (pos) => set({ ghostPosition: pos }),
   setActiveLayer: (layer) => set({ activeLayer: layer }),
+  setSliceAxis: (axis) => set({ sliceAxis: axis }),
   setWinLine: (line) => set({ winLine: line }),
   setGamePhase: (phase) => set({ gamePhase: phase }),
   setWinner: (winner) => set({ winner }),
@@ -111,6 +117,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         movesCount: Math.max(0, state.movesCount - 2),
         lastMove: newStones.length > 0 ? newStones[newStones.length - 1].position : null,
         ghostPosition: null,
+        sliceAxis: 'z' as SliceAxis,
       };
     }
 
@@ -121,6 +128,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       movesCount: state.movesCount - 1,
       lastMove: newStones.length > 0 ? newStones[newStones.length - 1].position : null,
       ghostPosition: null,
+      sliceAxis: 'z' as SliceAxis,
     };
   }),
 }));

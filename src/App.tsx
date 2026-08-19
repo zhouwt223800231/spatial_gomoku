@@ -16,13 +16,13 @@ import { GameHUD } from './components/UI/GameHUD';
 import { AIInsight } from './components/UI/AIInsight';
 import { StrategyRadar } from './components/UI/StrategyRadar';
 
-const KEYMAP: Record<'up' | 'down' | 'left' | 'right' | 'layerUp' | 'layerDown' | 'confirm' | 'cancel', readonly string[]> = {
-  up: ['w'],
-  down: ['s'],
-  left: ['a', 'arrowleft'],
-  right: ['d', 'arrowright'],
-  layerUp: ['arrowup'],
-  layerDown: ['arrowdown'],
+const KEYMAP: Record<'xNeg' | 'xPos' | 'yNeg' | 'yPos' | 'zNeg' | 'zPos' | 'confirm' | 'cancel', readonly string[]> = {
+  xNeg: ['a', 'arrowleft'],
+  xPos: ['d', 'arrowright'],
+  yNeg: ['s', 'arrowdown'],
+  yPos: ['w', 'arrowup'],
+  zNeg: ['q'],
+  zPos: ['e'],
   confirm: ['enter', ' '],
   cancel: ['escape'],
 };
@@ -39,6 +39,7 @@ export default function App() {
     placeStone,
     setGhostPosition,
     setActiveLayer,
+    setSliceAxis,
     setWinLine,
     setGamePhase,
     setWinner,
@@ -64,6 +65,7 @@ export default function App() {
     playPlaceSound(pos.z);
     recordMove(pos, [...st.stones, { position: pos, player: st.currentPlayer }], st.boardSize);
     st.setGhostPosition(null);
+    st.setSliceAxis('z');
     fineModeRef.current = false;
   }, [playPlaceSound, recordMove]);
 
@@ -87,6 +89,7 @@ export default function App() {
     } else {
       st.setGhostPosition(pos);
       st.setActiveLayer(pos.z);
+      st.setSliceAxis('z');
       fineModeRef.current = true;
       lastLockTimeRef.current = now;
     }
@@ -102,33 +105,30 @@ export default function App() {
       const size = st.boardSize;
       const clamp = (v: number) => Math.max(0, Math.min(size - 1, v));
 
-      const nudge = (dx: number, dy: number, dz: number) => {
+      const move = (axis: 'x' | 'y' | 'z', delta: number) => {
         const cur = st.ghostPosition;
-        if (!cur) return;
-        const pos = { x: clamp(cur.x + dx), y: clamp(cur.y + dy), z: clamp(cur.z + dz) };
-        st.setGhostPosition(pos);
-        st.setActiveLayer(pos.z);
-      };
-
-      const changeLayer = (dz: number) => {
-        const cur = st.ghostPosition;
-        if (cur) {
-          const pos = { x: cur.x, y: cur.y, z: clamp(cur.z + dz) };
-          st.setGhostPosition(pos);
-          st.setActiveLayer(pos.z);
-        } else {
-          st.setActiveLayer(clamp(st.activeLayer + dz));
+        if (!cur) {
+          // Without a locked ghost, Z keys still browse layers.
+          if (axis === 'z') st.setActiveLayer(clamp(st.activeLayer + delta));
+          return;
         }
+        const pos = { ...cur };
+        if (axis === 'x') pos.x = clamp(cur.x + delta);
+        else if (axis === 'y') pos.y = clamp(cur.y + delta);
+        else pos.z = clamp(cur.z + delta);
+        st.setGhostPosition(pos);
+        st.setSliceAxis(axis);
+        if (axis === 'z') st.setActiveLayer(pos.z);
       };
 
-      if (KEYMAP.up.includes(key)) { nudge(0, 1, 0); e.preventDefault(); }
-      else if (KEYMAP.down.includes(key)) { nudge(0, -1, 0); e.preventDefault(); }
-      else if (KEYMAP.left.includes(key)) { nudge(-1, 0, 0); e.preventDefault(); }
-      else if (KEYMAP.right.includes(key)) { nudge(1, 0, 0); e.preventDefault(); }
-      else if (KEYMAP.layerUp.includes(key)) { changeLayer(1); e.preventDefault(); }
-      else if (KEYMAP.layerDown.includes(key)) { changeLayer(-1); e.preventDefault(); }
+      if (KEYMAP.xNeg.includes(key)) { move('x', -1); e.preventDefault(); }
+      else if (KEYMAP.xPos.includes(key)) { move('x', 1); e.preventDefault(); }
+      else if (KEYMAP.yNeg.includes(key)) { move('y', -1); e.preventDefault(); }
+      else if (KEYMAP.yPos.includes(key)) { move('y', 1); e.preventDefault(); }
+      else if (KEYMAP.zNeg.includes(key)) { move('z', -1); e.preventDefault(); }
+      else if (KEYMAP.zPos.includes(key)) { move('z', 1); e.preventDefault(); }
       else if (KEYMAP.confirm.includes(key)) { e.preventDefault(); confirmPlace(); }
-      else if (KEYMAP.cancel.includes(key)) { e.preventDefault(); st.setGhostPosition(null); fineModeRef.current = false; }
+      else if (KEYMAP.cancel.includes(key)) { e.preventDefault(); st.setGhostPosition(null); st.setSliceAxis('z'); fineModeRef.current = false; }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
