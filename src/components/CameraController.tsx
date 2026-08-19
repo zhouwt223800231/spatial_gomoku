@@ -4,13 +4,20 @@ import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import { useGameStore } from '../store/gameStore';
 
+const ORBIT_DURATION = 3.0;
+
+const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+
 export function CameraController() {
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
   const gamePhase = useGameStore((s) => s.gamePhase);
   const boardSize = useGameStore((s) => s.boardSize);
   const resetViewTick = useGameStore((s) => s.resetViewTick);
+  const winLine = useGameStore((s) => s.winLine);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
+  const orbitStartRef = useRef<number | null>(null);
+  const orbitDoneRef = useRef(false);
 
   // Fit the whole board into view whenever size / view / overview changes.
   useEffect(() => {
@@ -53,7 +60,6 @@ export function CameraController() {
 
   useEffect(() => {
     const controls = new OrbitControlsImpl(camera, gl.domElement);
-    // Left-drag rotates, wheel zooms. Right button stays free for stone placement.
     controls.enablePan = false;
     controls.enableZoom = true;
     controls.enableRotate = true;
@@ -70,8 +76,62 @@ export function CameraController() {
     };
   }, [camera, gl, gamePhase, boardSize]);
 
-  useFrame(() => {
-    controlsRef.current?.update();
+  // Reset the orbit state whenever we leave the won state.
+  useEffect(() => {
+    if (gamePhase !== 'won') {
+      orbitStartRef.current = null;
+      orbitDoneRef.current = false;
+    }
+  }, [gamePhase]);
+
+  useFrame((state) => {
+    const controls = controlsRef.current;
+    const orbiting = gamePhase === 'won' && !!winLine && winLine.positions.length >= 2;
+
+    if (orbiting) {
+      if (orbitStartRef.current === null) orbitStartRef.current = state.clock.elapsedTime;
+      const t = state.clock.elapsedTime - orbitStartRef.current;
+      const offset = (boardSize - 1) / 2;
+      const a = new THREE.Vector3(
+        winLine.positions[0].x - offset,
+        winLine.positions[0].y - offset,
+        winLine.positions[0].z - offset,
+      );
+      const last = winLine.positions[winLine.positions.length - 1];
+      const b = new THREE.Vector3(last.x - offset, last.y - offset, last.z - offset);
+      const mid = a.clone().add(b).multiplyScalar(0.5);
+      const dir = b.clone().sub(a);
+      const lineLen = dir.length();
+      dir.normalize();
+      const up = new THREE.Vector3(0, 1, 0);
+      let u = new THREE.Vector3().crossVectors(dir, up);
+      if (u.lengthSq() < 0.001) u = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(1, 0, 0));
+      u.normalize();
+      const v = new THREE.Vector3().crossVectors(dir, u).normalize();
+      const radius = lineLen * 0.6 + 3;
+
+      if (!orbitDoneRef.current && t <= ORBIT_DURATION) {
+        if (controls) controls.enabled = false;
+        const p = easeInOut(Math.min(1, t / ORBIT_DURATION));
+        const angle = p * Math.PI * 2;
+        const pos = mid.clone()
+          .add(u.clone().multiplyScalar(Math.cos(angle) * radius))
+          .add(v.clone().multiplyScalar(Math.sin(angle) * radius));
+        camera.position.copy(pos);
+        camera.lookAt(mid);
+      } else {
+        orbitDoneRef.current = true;
+        if (controls) {
+          controls.target.copy(mid);
+          controls.enabled = true;
+          controls.update();
+        }
+      }
+    } else {
+      orbitStartRef.current = null;
+      orbitDoneRef.current = false;
+      controls?.update();
+    }
   });
 
   return null;

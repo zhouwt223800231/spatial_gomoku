@@ -4,7 +4,7 @@ import { useGameStore } from '../store/gameStore';
 import { Position } from '../types';
 import { Stone } from './Stone';
 import { GhostStone } from './GhostStone';
-import { WinLine } from './WinLine';
+import { VictoryCelebration } from './VictoryCelebration';
 
 interface Board3DProps {
   onCellLock?: (pos: Position) => void;
@@ -144,7 +144,7 @@ export function Board3D({ onCellLock, onCellPlace }: Board3DProps) {
       )}
 
       {winLine && (
-        <WinLine
+        <VictoryCelebration
           positions={winLine.positions.map(p => [
             p.x - offset,
             p.y - offset,

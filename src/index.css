@@ -28,3 +28,35 @@
            hover:scale-105 active:scale-95;
   }
 }
+@keyframes victory-title {
+  0% { opacity: 0; transform: scale(0.82); filter: blur(6px); }
+  60% { opacity: 1; transform: scale(1.04); filter: blur(0); }
+  100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+.victory-title {
+  animation: victory-title 0.9s ease 4.4s both;
+  text-shadow: 0 0 18px rgba(251, 191, 36, 0.55), 0 0 44px rgba(251, 191, 36, 0.28);
+}
+.victory-title--blue {
+  text-shadow: 0 0 18px rgba(96, 165, 250, 0.55), 0 0 44px rgba(96, 165, 250, 0.28);
+}
+
+@keyframes victory-subtitle {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+.victory-subtitle {
+  animation: victory-subtitle 0.8s ease 5.0s both;
+}
+
+@keyframes victory-btn {
+  0% { opacity: 0; transform: translateY(14px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.victory-btn {
+  animation: victory-btn 0.6s ease 5.6s both;
+}
+
+.victory-vignette {
+  background: radial-gradient(ellipse at center, rgba(7,11,22,0.12) 42%, rgba(7,11,22,0.78) 100%);
+}

@@ -238,15 +238,23 @@ export default function App() {
       )}
 
       {gamePhase === 'won' && (
-        <div className="absolute inset-0 flex items-center justify-center z-20 bg-[#070b16]/40 backdrop-blur-sm">
-          <div className="text-center">
-            <h2 className={`text-5xl font-light mb-4 ${winner === 'black' ? 'text-amber-400' : 'text-blue-400'}`}>
+        <div className="absolute inset-0 z-20 flex items-center justify-center">
+          <div className="absolute inset-0 victory-vignette" />
+          <div className="relative text-center">
+            <h2 className={`victory-title text-6xl font-light tracking-widest mb-4 ${winner === 'black' ? 'text-amber-400' : 'text-blue-400 victory-title--blue'}`}>
               {winner === 'black' ? 'Black Wins' : 'White Wins'}
             </h2>
-            <p className="text-white/40 mb-8">Five in a row in 3D space!</p>
-            <button onClick={() => useGameStore.getState().resetGame()} className="glass-button">
-              Play Again
-            </button>
+            <p className="victory-subtitle text-white/50 text-sm uppercase tracking-widest mb-10">
+              Five in a row in 3D space
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button onClick={() => useGameStore.getState().resetGame()} className="glass-button victory-btn">
+                Play Again
+              </button>
+              <button onClick={() => useGameStore.setState({ gamePhase: 'menu' })} className="glass-button victory-btn">
+                Main Menu
+              </button>
+            </div>
           </div>
         </div>
       )}
