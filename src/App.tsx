@@ -167,7 +167,7 @@ export default function App() {
       setGamePhase('won');
       if (!useGameStore.getState().victoryChimePlayed) {
         useGameStore.setState({ victoryChimePlayed: true });
-        playVictoryChime();
+        playVictoryChime(win.positions, boardSize);
       }
 
       const isPlayerWin = gameMode === 'ai' && win.player === 'black';

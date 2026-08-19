@@ -1,11 +1,24 @@
 import { useCallback, useRef } from 'react';
 import * as Tone from 'tone';
+import { Position } from '../types';
 
 // --- Wet-Hands-style dreamy pluck constants (tune here) ---
-const PLUCK_SCALE = ['A4', 'C#5', 'E5', 'F#5', 'A5'];
+// A-major pentatonic, two octaves (A3..A5): distance from board center -> pitch.
+const PENTA = ['A3', 'B3', 'C#4', 'E4', 'F#4', 'A4', 'B4', 'C#5', 'E5', 'F#5', 'A5'];
 const PLUCK_GAPS = [0.55, 0.45, 0.36, 0.28]; // slow -> fast
 const PLUCK_DURATION = 1.2;                   // per-note ring before release
 const PLUCK_STOP_MS = 3500;                   // let the last tail + reverb decay
+
+// Map a stone's grid position to an A-major pentatonic pitch based on its
+// Euclidean distance from the board center: center = lowest, corners = highest.
+const distancePitch = (pos: Position, boardSize: number): string => {
+  const c = (boardSize - 1) / 2;
+  const d = Math.hypot(pos.x - c, pos.y - c, pos.z - c);
+  const dMax = Math.hypot(c, c, c); // center -> farthest corner
+  const t = dMax > 0 ? d / dMax : 0;
+  const index = Math.round(t * (PENTA.length - 1));
+  return PENTA[Math.max(0, Math.min(PENTA.length - 1, index))];
+};
 
 export function useAudio() {
   const synthRef = useRef<Tone.PolySynth | null>(null);
@@ -77,15 +90,18 @@ export function useAudio() {
     synthRef.current.triggerAttackRelease(['C4', 'E4', 'G4', 'C5'], '2n');
   }, []);
 
-  // Wet-Hands-style pluck: A-major pentatonic ascent, slow -> fast.
-  const playVictoryChime = useCallback(() => {
+  // Victory pluck: one note per winning stone, pitch derived from each stone's
+  // distance to the board center (closer = lower, farther = higher), played in
+  // visual order (first stone -> last stone) with a slow-to-fast rhythm.
+  const playVictoryChime = useCallback((positions: Position[], boardSize: number) => {
     if (!pluckSynthRef.current) return;
     const synth = pluckSynthRef.current;
     const noise = noiseSynthRef.current;
+    const scale = positions.map((p) => distancePitch(p, boardSize));
 
     Tone.Transport.cancel(0);
     let at = 0;
-    PLUCK_SCALE.forEach((note, i) => {
+    scale.forEach((note, i) => {
       const time = at;
       Tone.Transport.schedule((t) => {
         synth.triggerAttackRelease(note, PLUCK_DURATION, t);
