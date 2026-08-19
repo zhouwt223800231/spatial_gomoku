@@ -9,6 +9,10 @@ const PLUCK_GAPS = [0.55, 0.45, 0.36, 0.28]; // slow -> fast
 const PLUCK_DURATION = 1.2;                   // per-note ring before release
 const PLUCK_STOP_MS = 3500;                   // let the last tail + reverb decay
 
+// Placement tones: same A-major pentatonic, narrowed to A3..E5, short & crisp.
+const PLACE_PENTA = ['A3', 'B3', 'C#4', 'E4', 'F#4', 'A4', 'B4', 'C#5', 'E5'];
+const PLACE_DURATION = 0.3;
+
 // Map a stone's grid position to an A-major pentatonic pitch based on its
 // Euclidean distance from the board center: center = lowest, corners = highest.
 const distancePitch = (pos: Position, boardSize: number): string => {
@@ -78,11 +82,15 @@ export function useAudio() {
     initialized.current = true;
   }, []);
 
-  const playPlaceSound = useCallback((layer: number) => {
+  const playPlaceSound = useCallback((pos: Position, boardSize: number) => {
     if (!synthRef.current) return;
-    const notes = ['C3', 'D3', 'E3', 'F3', 'G3', 'A3', 'B3'];
-    const note = notes[layer % notes.length];
-    synthRef.current.triggerAttackRelease(note, '8n');
+    const c = (boardSize - 1) / 2;
+    const d = Math.hypot(pos.x - c, pos.y - c, pos.z - c);
+    const dMax = Math.hypot(c, c, c);
+    const t = dMax > 0 ? d / dMax : 0;
+    const index = Math.round(t * (PLACE_PENTA.length - 1));
+    const note = PLACE_PENTA[Math.max(0, Math.min(PLACE_PENTA.length - 1, index))];
+    synthRef.current.triggerAttackRelease(note, PLACE_DURATION);
   }, []);
 
   const playWinSound = useCallback(() => {

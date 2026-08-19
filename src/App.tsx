@@ -67,7 +67,7 @@ export default function App() {
     const occupied = st.stones.some(s => s.position.x === pos.x && s.position.y === pos.y && s.position.z === pos.z);
     if (occupied) return;
     st.placeStone(pos);
-    playPlaceSound(pos.z);
+    playPlaceSound(pos, st.boardSize);
     recordMove(pos, [...st.stones, { position: pos, player: st.currentPlayer }], st.boardSize);
     st.setGhostPosition(null);
     st.setSliceAxis('z');
@@ -190,7 +190,7 @@ export default function App() {
 
         const move = findBestMove(stones, 'white', boardSize, weights, maxDepth);
         placeStone(move);
-        playPlaceSound(move.z);
+        playPlaceSound(move, boardSize);
         setAiThinking(false);
       }, 800);
 
