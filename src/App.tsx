@@ -11,10 +11,12 @@ import { Board3D } from './components/Board3D';
 import { CameraController } from './components/CameraController';
 import { WebGLDiagnostic } from './components/WebGLDiagnostic';
 import { Starfield } from './components/Starfield';
+import { LiveLines } from './components/LiveLines';
 import { Menu } from './components/UI/Menu';
 import { GameHUD } from './components/UI/GameHUD';
 import { AIInsight } from './components/UI/AIInsight';
 import { StrategyRadar } from './components/UI/StrategyRadar';
+import { ProjectionMinimap } from './components/ProjectionMinimap';
 
 const KEYMAP: Record<'xNeg' | 'xPos' | 'yNeg' | 'yPos' | 'zNeg' | 'zPos' | 'confirm' | 'cancel', readonly string[]> = {
   xNeg: ['a', 'arrowleft'],
@@ -40,6 +42,9 @@ export default function App() {
     setGhostPosition,
     setActiveLayer,
     setSliceAxis,
+    viewMode,
+    setViewMode,
+    requestOverview,
     setWinLine,
     setGamePhase,
     setWinner,
@@ -105,10 +110,13 @@ export default function App() {
       const size = st.boardSize;
       const clamp = (v: number) => Math.max(0, Math.min(size - 1, v));
 
+      // View controls (work regardless of a locked ghost)
+      if (key === '0' || key === 'f') { e.preventDefault(); st.requestOverview(); return; }
+      if (key === 'o') { e.preventDefault(); st.setViewMode(st.viewMode === 'orthographic' ? 'perspective' : 'orthographic'); return; }
+
       const move = (axis: 'x' | 'y' | 'z', delta: number) => {
         const cur = st.ghostPosition;
         if (!cur) {
-          // Without a locked ghost, Z keys still browse layers.
           if (axis === 'z') st.setActiveLayer(clamp(st.activeLayer + delta));
           return;
         }
@@ -198,7 +206,11 @@ export default function App() {
   return (
     <div className="w-screen h-screen relative space-bg" onContextMenu={(e) => e.preventDefault()}>
       <Canvas
-        camera={{ position: [5, 5, 5], fov: 45 }}
+        key={viewMode}
+        orthographic={viewMode === 'orthographic'}
+        camera={viewMode === 'orthographic'
+          ? { position: [6, 6, 6], zoom: 1, near: -100, far: 100, left: -1, right: 1, top: 1, bottom: -1 }
+          : { position: [5, 5, 5], fov: 45, near: 0.1, far: 200 }}
         gl={{ alpha: true, antialias: true }}
       >
         <fog attach="fog" args={['#0b1020', 10, 30]} />
@@ -209,6 +221,7 @@ export default function App() {
 
         <Starfield />
         <Board3D onCellLock={handleCellLock} onCellPlace={handleCellPlace} />
+        {gamePhase === 'playing' && <LiveLines />}
         <CameraController />
         <WebGLDiagnostic />
       </Canvas>
@@ -219,6 +232,7 @@ export default function App() {
         <>
           <GameHUD />
           <StrategyRadar />
+          <ProjectionMinimap />
           {gameMode === 'ai' && <AIInsight />}
         </>
       )}

@@ -1,6 +1,6 @@
 import { Position, Player, StoneData, WinLineData, BoardSize } from '../types';
 
-const DIRECTIONS: Position[] = [
+export const DIRECTIONS: Position[] = [
   { x: 1, y: 0, z: 0 },
   { x: 0, y: 1, z: 0 },
   { x: 0, y: 0, z: 1 },
@@ -16,6 +16,65 @@ const DIRECTIONS: Position[] = [
   { x: 1, y: -1, z: -1 },
 ];
 
+const key = (p: Position) => `${p.x},${p.y},${p.z}`;
+
+const inBounds = (p: Position, size: BoardSize) =>
+  p.x >= 0 && p.x < size && p.y >= 0 && p.y < size && p.z >= 0 && p.z < size;
+
+export interface AlignedRun {
+  player: Player;
+  positions: Position[];
+}
+
+/**
+ * Find every same-player aligned run of length >= minLen along the 13 winning
+ * directions. Runs are de-duplicated so each contiguous line is returned once.
+ */
+export function findAlignedRuns(
+  stones: StoneData[],
+  boardSize: BoardSize,
+  minLen = 3
+): AlignedRun[] {
+  const stoneMap = new Map<string, Player>();
+  stones.forEach((s) => stoneMap.set(key(s.position), s.player));
+
+  const seen = new Set<string>();
+  const runs: AlignedRun[] = [];
+
+  for (const stone of stones) {
+    for (const dir of DIRECTIONS) {
+      const behind: Position = {
+        x: stone.position.x - dir.x,
+        y: stone.position.y - dir.y,
+        z: stone.position.z - dir.z,
+      };
+      // Only start a run from its first stone (no same player right behind).
+      if (inBounds(behind, boardSize) && stoneMap.get(key(behind)) === stone.player) continue;
+
+      const positions: Position[] = [stone.position];
+      for (let i = 1; i < 5; i++) {
+        const p: Position = {
+          x: stone.position.x + dir.x * i,
+          y: stone.position.y + dir.y * i,
+          z: stone.position.z + dir.z * i,
+        };
+        if (!inBounds(p, boardSize) || stoneMap.get(key(p)) !== stone.player) break;
+        positions.push(p);
+      }
+
+      if (positions.length >= minLen) {
+        const id = positions.map((p) => key(p)).sort().join('|');
+        if (!seen.has(id)) {
+          seen.add(id);
+          runs.push({ player: stone.player, positions });
+        }
+      }
+    }
+  }
+
+  return runs;
+}
+
 export function checkWin(
   stones: StoneData[],
   boardSize: BoardSize
@@ -28,7 +87,7 @@ export function checkWin(
   for (const stone of stones) {
     for (const dir of DIRECTIONS) {
       const line: Position[] = [stone.position];
-      let player = stone.player;
+      const player = stone.player;
 
       for (let i = 1; i < 5; i++) {
         const pos: Position = {
@@ -42,8 +101,7 @@ export function checkWin(
           pos.z < 0 || pos.z >= boardSize
         ) break;
 
-        const key = `${pos.x},${pos.y},${pos.z}`;
-        if (stoneMap.get(key) === player) {
+        if (stoneMap.get(`${pos.x},${pos.y},${pos.z}`) === player) {
           line.push(pos);
         } else {
           break;

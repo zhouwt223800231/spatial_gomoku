@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Position, Player, StoneData, GameMode, GamePhase, WinLineData, BoardSize, AIInsight } from '../types';
+import { Position, Player, StoneData, GameMode, GamePhase, WinLineData, BoardSize, AIInsight, ViewMode } from '../types';
 
 export type SliceAxis = 'x' | 'y' | 'z';
 
@@ -14,6 +14,9 @@ interface GameState {
   ghostPosition: Position | null;
   activeLayer: number;
   sliceAxis: SliceAxis;
+  viewMode: ViewMode;
+  showLines: boolean;
+  resetViewTick: number;
   aiThinking: boolean;
   aiInsights: AIInsight[];
   movesCount: number;
@@ -26,6 +29,9 @@ interface GameState {
   setGhostPosition: (pos: Position | null) => void;
   setActiveLayer: (layer: number) => void;
   setSliceAxis: (axis: SliceAxis) => void;
+  setViewMode: (mode: ViewMode) => void;
+  setShowLines: (show: boolean) => void;
+  requestOverview: () => void;
   setWinLine: (line: WinLineData | null) => void;
   setGamePhase: (phase: GamePhase) => void;
   setWinner: (winner: Player | null) => void;
@@ -49,6 +55,9 @@ const createInitialState = () => ({
   ghostPosition: null as Position | null,
   activeLayer: 2,
   sliceAxis: 'z' as SliceAxis,
+  viewMode: 'perspective' as ViewMode,
+  showLines: true,
+  resetViewTick: 0,
   aiThinking: false,
   aiInsights: [] as AIInsight[],
   movesCount: 0,
@@ -90,6 +99,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   setGhostPosition: (pos) => set({ ghostPosition: pos }),
   setActiveLayer: (layer) => set({ activeLayer: layer }),
   setSliceAxis: (axis) => set({ sliceAxis: axis }),
+  setViewMode: (mode) => set({ viewMode: mode }),
+  setShowLines: (show) => set({ showLines: show }),
+  requestOverview: () => set((state) => ({ resetViewTick: state.resetViewTick + 1 })),
   setWinLine: (line) => set({ winLine: line }),
   setGamePhase: (phase) => set({ gamePhase: phase }),
   setWinner: (winner) => set({ winner }),

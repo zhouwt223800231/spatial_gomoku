@@ -65,6 +65,8 @@ export function Menu() {
             <li>Q / E：沿 Z 轴切层</li>
             <li>Enter / 空格 / 双击右键：确认落子</li>
             <li>Esc：取消预览</li>
+            <li>0 / F：全局总览取景</li>
+            <li>O：透视 / 正交视图切换</li>
             <li className="text-white/40">左键拖拽：旋转视角 · 滚轮：缩放</li>
           </ul>
         </div>

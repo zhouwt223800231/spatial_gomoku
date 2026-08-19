@@ -2,7 +2,10 @@ import React from 'react';
 import { useGameStore } from '../../store/gameStore';
 
 export function GameHUD() {
-  const { currentPlayer, movesCount, gameMode, aiThinking, resetGame, undoMove, stones, activeLayer, boardSize, setActiveLayer } = useGameStore();
+  const {
+    currentPlayer, movesCount, gameMode, aiThinking, resetGame, undoMove, stones,
+    activeLayer, boardSize, setActiveLayer, showLines, setShowLines, viewMode, setViewMode, requestOverview,
+  } = useGameStore();
 
   return (
     <>
@@ -21,7 +24,7 @@ export function GameHUD() {
         </div>
       </div>
 
-      {/* Top Right - Game Info + Layer */}
+      {/* Top Right - Game Info + View controls */}
       <div className="absolute top-6 right-6 z-10">
         <div className="glass-panel p-4 min-w-[170px] space-y-3">
           <div className="flex justify-between text-sm">
@@ -44,6 +47,23 @@ export function GameHUD() {
               disabled={activeLayer === boardSize - 1}
               className="glass-button px-2 py-1 text-xs disabled:opacity-30"
             >&#9654;</button>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => setShowLines(!showLines)}
+              className={`flex-1 px-2 py-1 rounded-lg border text-xs transition-all ${showLines ? 'bg-white/20 border-white/40 text-white' : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'}`}
+            >
+              Lines {showLines ? 'On' : 'Off'}
+            </button>
+            <button onClick={requestOverview} className="flex-1 glass-button px-2 py-1 text-xs">
+              Overview
+            </button>
+            <button
+              onClick={() => setViewMode(viewMode === 'orthographic' ? 'perspective' : 'orthographic')}
+              className="flex-1 glass-button px-2 py-1 text-xs"
+            >
+              {viewMode === 'orthographic' ? '3D' : '2D'}
+            </button>
           </div>
         </div>
       </div>

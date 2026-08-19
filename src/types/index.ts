@@ -14,6 +14,7 @@ export interface StoneData {
 export type GameMode = 'pvp' | 'ai';
 export type GamePhase = 'menu' | 'playing' | 'won' | 'draw';
 export type BoardSize = 5 | 7 | 9;
+export type ViewMode = 'perspective' | 'orthographic';
 
 export interface WinLineData {
   positions: Position[];
