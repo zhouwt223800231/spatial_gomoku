@@ -19,7 +19,7 @@ export function StrategyRadar() {
         if (stone.player !== currentPlayer) continue;
         let count = 1;
         for (let i = 1; i < 5; i++) {
-          const pos = { 
+          const pos = {
             x: stone.position.x + d.dir.x * i,
             y: stone.position.y + d.dir.y * i,
             z: stone.position.z + d.dir.z * i
@@ -35,22 +35,22 @@ export function StrategyRadar() {
     });
   }, [stones, boardSize, currentPlayer]);
 
+  const barColors = ['bg-cyan-400', 'bg-blue-400', 'bg-violet-400'];
+
   return (
     <div className="absolute top-44 left-6 z-10">
-      <div className="glass-panel p-4 w-36">
-        <h3 className="text-white/60 text-xs uppercase tracking-wider mb-3">Strategy Radar</h3>
-        <div className="space-y-3">
-          {threats.map(t => (
+      <div className="glass-panel p-5 w-40">
+        <h3 className="panel-label mb-4">Strategy Radar</h3>
+        <div className="space-y-3.5">
+          {threats.map((t, i) => (
             <div key={t.key}>
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-white/40">{t.name}</span>
-                <span className="text-white/60">{Math.round(t.threat * 100)}%</span>
+              <div className="flex justify-between text-xs mb-1.5">
+                <span className="text-white/45">{t.name}</span>
+                <span className="mono-num text-white/70">{Math.round(t.threat * 100)}%</span>
               </div>
               <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    t.threat > 0.8 ? 'bg-red-400' : t.threat > 0.5 ? 'bg-amber-400' : 'bg-blue-400'
-                  }`}
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${barColors[i % barColors.length]}`}
                   style={{ width: `${t.threat * 100}%` }}
                 />
               </div>

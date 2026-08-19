@@ -51,10 +51,16 @@ function MiniView({ axis, stones, boardSize, ghost }: MiniViewProps) {
   };
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="text-[9px] uppercase tracking-wider text-white/50">{VIEW_LABELS[axis]}</span>
-      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} className="rounded-lg bg-black/30 border border-white/10">
-        <rect x={PLOT_LEFT} y={PLOT_TOP} width={PLOT_RIGHT - PLOT_LEFT} height={PLOT_BOTTOM - PLOT_TOP} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1" rx="3" />
+    <div className="flex flex-col items-center gap-1.5">
+      <span className="font-mono text-[9px] uppercase tracking-wider text-white/55">{VIEW_LABELS[axis]}</span>
+      <svg
+        width={SIZE}
+        height={SIZE}
+        viewBox={`0 0 ${SIZE} ${SIZE}`}
+        className="rounded-xl bg-[#0a1224]/70 border border-cyan-200/15"
+        style={{ boxShadow: 'inset 0 0 18px rgba(103,232,249,0.05), 0 0 12px rgba(103,232,249,0.06)' }}
+      >
+        <rect x={PLOT_LEFT} y={PLOT_TOP} width={PLOT_RIGHT - PLOT_LEFT} height={PLOT_BOTTOM - PLOT_TOP} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="1" rx="3" />
 
         {/* stones */}
         {stones.map((s, i) => {
@@ -112,9 +118,9 @@ export function ProjectionMinimap() {
 
   return (
     <div className="absolute bottom-24 left-6 z-10">
-      <div className="glass-panel p-3">
-        <h3 className="text-white/50 text-[10px] uppercase tracking-wider text-center mb-2">Projections</h3>
-        <div className="flex gap-2">
+      <div className="glass-panel p-4">
+        <h3 className="panel-label text-center mb-3">Projections</h3>
+        <div className="flex gap-2.5">
           <MiniView axis="xy" stones={stones} boardSize={boardSize} ghost={ghost} />
           <MiniView axis="xz" stones={stones} boardSize={boardSize} ghost={ghost} />
           <MiniView axis="yz" stones={stones} boardSize={boardSize} ghost={ghost} />

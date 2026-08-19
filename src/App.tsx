@@ -246,7 +246,7 @@ export default function App() {
         <div className="absolute inset-0 z-20 flex items-center justify-center">
           <div className="absolute inset-0 victory-vignette" />
           <div className="relative text-center">
-            <h2 className={`victory-title text-6xl font-light tracking-widest mb-4 ${winner === 'black' ? 'text-amber-400' : 'text-blue-400 victory-title--blue'}`}>
+            <h2 className={`victory-title text-6xl font-light tracking-widest mb-4 ${winner === 'black' ? 'victory-title--amber' : 'victory-title--blue'}`}>
               {winner === 'black' ? 'Black Wins' : 'White Wins'}
             </h2>
             <p className="victory-subtitle text-white/50 text-sm uppercase tracking-widest mb-10">
