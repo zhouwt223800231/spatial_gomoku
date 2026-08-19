@@ -7,7 +7,13 @@ export interface AdaptiveResult {
   weights: EvalWeights;
   maxDepth: number;
   blockWeight: number;
+  nodeBudget: number;
+  useBook: boolean;
   insight: string | null;
+}
+
+function difficultyNodeBudget(d: AiDifficulty): number {
+  return d === 'easy' ? 20_000 : d === 'hard' ? 180_000 : 80_000;
 }
 
 export function getAdaptiveWeights(
@@ -20,71 +26,72 @@ export function getAdaptiveWeights(
   const exp = experience ?? loadAIExperience();
   let maxDepth = difficultyDepth(difficulty);
   let blockWeight = difficultyBlockWeight(difficulty);
+  let nodeBudget = difficultyNodeBudget(difficulty);
+  let useBook = difficulty !== 'easy';
   let insight: string | null = null;
 
-  // --- Difficulty floor/cap ---
-  // Experience may push depth up on hard only; never below the difficulty floor.
-  if (difficulty === 'hard' && exp.totalGames >= 3 && exp.wins / exp.totalGames > 0.6) {
-    maxDepth = 4;
-  }
+  // --- Easy: forgiving and fast ---
   if (difficulty === 'easy') {
     maxDepth = 2;
     weights.ATTACK = 0.7;
     blockWeight = 0;
+    nodeBudget = 20_000;
+    useBook = false;
   }
 
-  // --- Win-rate feedback (experience library) ---
+  // --- Experience / win-rate feedback (learning library) ---
   const winRate = exp.totalGames > 0 ? exp.wins / exp.totalGames : 0.5;
   if (exp.totalGames >= 3) {
     if (winRate > 0.65) {
       weights.ATTACK = 1.25;
       weights.DEFENSE = 1.15;
-      insight = 'AI library: strong record recently -attacking more confidently';
+      if (difficulty === 'hard') nodeBudget = 220_000;
+      insight = 'AI library: strong record recently - attacking more confidently';
     } else if (winRate < 0.4) {
       weights.DEFENSE = 1.4;
       weights.ATTACK = 0.9;
-      insight = 'AI library: recent losses -defending more carefully';
+      nodeBudget = Math.max(nodeBudget, 100_000);
+      insight = 'AI library: recent losses - defending more carefully';
     }
   }
 
-  // --- Learned weakness: losses while an open-three was on the board ---
   if (exp.recentLossByOpenThree >= 2) {
     blockWeight = Math.max(blockWeight, 1.6);
     weights.DEFENSE = Math.max(weights.DEFENSE, 1.5);
-    insight = 'AI library: you often win through open threes -blocking harder';
+    insight = 'AI library: you often win through open threes - blocking harder';
   }
 
-  // --- Player-profile based adjustments (existing behaviour, honest wording) ---
+  // --- Player-profile based adjustments (honest wording) ---
   const pWinRate = profile.totalGames > 0 ? profile.wins / profile.totalGames : 0.5;
   if (pWinRate > 0.7) {
     weights.DEFENSE = Math.max(weights.DEFENSE, 1.2);
   } else if (pWinRate < 0.3) {
     weights.ATTACK = Math.min(weights.ATTACK, 0.8);
-    if (!insight) insight = 'Observed: you win less than 30% -AI playing at a gentler setting';
+    if (!insight) insight = 'Observed: you win less than 30% - AI playing at a gentler setting';
   }
 
   const zVuln = profile.vulnerabilities.find(v => v.direction === 'Z_AXIS');
   if (zVuln && zVuln.exposureRate > 0.5) {
     weights.Z_AXIS = 50;
-    if (!insight) insight = 'Observed: you rarely use the Z axis -AI weights vertical lines higher';
+    if (!insight) insight = 'Observed: you rarely use the Z axis - AI weights vertical lines higher';
   }
 
   const diagVuln = profile.vulnerabilities.find(v => v.direction === 'DIAGONAL');
   if (diagVuln && diagVuln.exposureRate > 0.5) {
     weights.DIAGONAL = 30;
-    if (!insight) insight = 'Observed: you play few diagonals -AI weights diagonals higher';
+    if (!insight) insight = 'Observed: you play few diagonals - AI weights diagonals higher';
   }
 
   if (profile.style.aggressiveness > 0.7) {
     weights.DEFENSE = Math.max(weights.DEFENSE, 1.3);
     weights.ATTACK = Math.min(weights.ATTACK, 0.8);
-    if (!insight) insight = 'Observed: your moves are aggressive -AI weights defense higher';
+    if (!insight) insight = 'Observed: your moves are aggressive - AI weights defense higher';
   }
 
   if (profile.style.patternConsistency > 0.8 && gameCount > 5) {
     weights.PATTERN_BREAK = 2.0;
-    if (!insight) insight = 'Observed: your opening patterns repeat -AI adds pattern-break weight';
+    if (!insight) insight = 'Observed: your opening patterns repeat - AI adds pattern-break weight';
   }
 
-  return { weights, maxDepth, blockWeight, insight };
+  return { weights, maxDepth, blockWeight, nodeBudget, useBook, insight };
 }

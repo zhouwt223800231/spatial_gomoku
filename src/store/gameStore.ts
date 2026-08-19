@@ -25,6 +25,7 @@ interface GameState {
   lastMove: Position | null;
   victoryChimePlayed: boolean;
   celebrationDismissed: boolean;
+  reviewMode: boolean;
 
   setBoardSize: (size: BoardSize) => void;
   setGameMode: (mode: GameMode) => void;
@@ -43,6 +44,7 @@ interface GameState {
   setWinner: (winner: Player | null) => void;
   setAiThinking: (thinking: boolean) => void;
   setCelebrationDismissed: (dismissed: boolean) => void;
+  setReviewMode: (mode: boolean) => void;
   addAiInsight: (insight: AIInsight) => void;
   clearAiInsights: () => void;
   resetGame: () => void;
@@ -73,6 +75,7 @@ const createInitialState = () => ({
   lastMove: null as Position | null,
   victoryChimePlayed: false,
   celebrationDismissed: false,
+  reviewMode: false,
 });
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -124,6 +127,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   setWinner: (winner) => set({ winner }),
   setAiThinking: (thinking) => set({ aiThinking: thinking }),
   setCelebrationDismissed: (dismissed) => set({ celebrationDismissed: dismissed }),
+  setReviewMode: (mode) => set({ reviewMode: mode }),
   addAiInsight: (insight) => set((state) => ({ aiInsights: [...state.aiInsights.slice(-4), insight] })),
   clearAiInsights: () => set({ aiInsights: [] }),
 

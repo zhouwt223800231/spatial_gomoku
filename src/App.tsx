@@ -3,9 +3,11 @@ import { Canvas } from '@react-three/fiber';
 import { useGameStore } from './store/gameStore';
 import { Position, Player } from './types';
 import { checkWin, isDraw } from './game/rules';
-import { findBestMove, findBlockingMoves } from './game/ai';
+import { findBestMove, findBlockingMoves, findThreatEnds } from './game/ai';
 import { getAdaptiveWeights } from './game/adaptiveAI';
 import { loadAIExperience, updateAIExperience } from './game/aiExperience';
+import { recordGameOutcome, stonesToMoves } from './game/openingBook';
+import { runSelfPlayGame } from './game/selfPlay';
 import { usePlayerProfile } from './hooks/usePlayerProfile';
 import { useAudio } from './hooks/useAudio';
 import { Board3D } from './components/Board3D';
@@ -53,6 +55,7 @@ export default function App() {
     addAiInsight,
     clearAiInsights,
     movesCount,
+    reviewMode,
   } = useGameStore();
 
   const { profile, recordMove, recordGame } = usePlayerProfile();
@@ -111,7 +114,6 @@ export default function App() {
       const size = st.boardSize;
       const clamp = (v: number) => Math.max(0, Math.min(size - 1, v));
 
-      // View controls (work regardless of a locked ghost)
       if (key === '0' || key === 'f' || key === 'r') { e.preventDefault(); st.requestOverview(); return; }
       if (key === 'o') { e.preventDefault(); st.setViewMode(st.viewMode === 'orthographic' ? 'perspective' : 'orthographic'); return; }
 
@@ -189,6 +191,7 @@ export default function App() {
           blocks: aiBlocksRef.current,
         });
         aiBlocksRef.current = 0;
+        recordGameOutcome(stonesToMoves(stones), win.player);
       }
     } else if (isDraw(stones, boardSize)) {
       setGamePhase('draw');
@@ -202,6 +205,7 @@ export default function App() {
           blocks: aiBlocksRef.current,
         });
         aiBlocksRef.current = 0;
+        recordGameOutcome(stonesToMoves(stones), null);
       }
     }
   }, [stones, boardSize, gameMode, movesCount, recordGame]);
@@ -213,12 +217,17 @@ export default function App() {
 
     setAiThinking(true);
     aiTimeoutRef.current = setTimeout(() => {
-      const { weights, maxDepth, blockWeight, insight } = getAdaptiveWeights(profile, movesCount, aiDifficulty, loadAIExperience());
+      const { weights, maxDepth, blockWeight, nodeBudget, useBook, insight } = getAdaptiveWeights(profile, movesCount, aiDifficulty, loadAIExperience());
       if (insight) {
         addAiInsight({ id: Date.now().toString(), type: 'adapted', message: insight, timestamp: Date.now() });
       }
-      const result = findBestMove(stones, ai, boardSize, weights, maxDepth, blockWeight);
-      aiBlocksRef.current += result.blocked ? 1 : 0;
+      const result = findBestMove(stones, ai, boardSize, weights, maxDepth, blockWeight, nodeBudget, useBook);
+      const opp = ai === 'black' ? 'white' as Player : 'black' as Player;
+      const threat3 = findThreatEnds(stones, opp, boardSize, 3);
+      const threat4 = findThreatEnds(stones, opp, boardSize, 4);
+      const isBlock = threat3.has(`${result.position.x},${result.position.y},${result.position.z}`) ||
+                      threat4.has(`${result.position.x},${result.position.y},${result.position.z}`);
+      aiBlocksRef.current += isBlock || result.blocked ? 1 : 0;
       placeStone(result.position);
       playPlaceSound(result.position, boardSize);
       setAiThinking(false);
@@ -233,10 +242,35 @@ export default function App() {
     }
   }, [gamePhase, clearAiInsights]);
 
+  // Background self-play training while idle in the menu: the AI gradually
+  // strengthens its opening book across consecutive sessions.
+  useEffect(() => {
+    if (gamePhase !== 'menu') return;
+    let cancelled = false;
+    let runs = 0;
+    const tick = () => {
+      if (cancelled || runs >= 2) return;
+      const deadline = (performance.now() + 60);
+      while (performance.now() < deadline && runs < 2) {
+        runSelfPlayGame(useGameStore.getState().boardSize);
+        runs += 1;
+      }
+      if (runs < 2) requestIdleCallback(tick, { timeout: 4000 });
+    };
+    const id = requestIdleCallback(tick, { timeout: 4000 });
+    return () => {
+      cancelled = true;
+      cancelIdleCallback(id);
+    };
+  }, [gamePhase]);
+
   useEffect(() => () => { cancelVictoryChime(); }, [cancelVictoryChime]);
 
   const winner = useGameStore.getState().winner;
-  const dismissCelebration = () => useGameStore.getState().setCelebrationDismissed(true);
+  const dismissCelebration = () => {
+    useGameStore.getState().setCelebrationDismissed(true);
+    useGameStore.getState().setReviewMode(true);
+  };
 
   return (
     <div className="w-screen h-screen relative space-bg" onContextMenu={(e) => e.preventDefault()}>
@@ -256,7 +290,7 @@ export default function App() {
 
         <Starfield />
         <Board3D onCellSelect={handleCellSelect} />
-        {gamePhase === 'playing' && <LiveLines />}
+        {(gamePhase === 'playing' || reviewMode) && <LiveLines />}
         <CameraController />
         <WebGLDiagnostic />
       </Canvas>
@@ -272,7 +306,7 @@ export default function App() {
         </div>
       )}
 
-      {gamePhase === 'won' && (
+      {gamePhase === 'won' && !reviewMode && (
         <div className="absolute inset-0 z-20 flex items-center justify-center">
           <div className="absolute inset-0 victory-vignette" />
           <div className="relative text-center">
@@ -297,13 +331,13 @@ export default function App() {
         </div>
       )}
 
-      {gamePhase === 'draw' && (
+      {gamePhase === 'draw' && !reviewMode && (
         <div className="absolute inset-0 flex items-center justify-center z-20 bg-[#070b16]/40 backdrop-blur-sm">
           <div className="text-center">
             <h2 className="text-5xl font-light text-white/60 mb-4">Draw</h2>
             <p className="text-white/40 mb-8">Board is full</p>
             <div className="flex gap-3 justify-center">
-              <button onClick={() => useGameStore.setState({ gamePhase: 'won' })} className="glass-button">
+              <button onClick={dismissCelebration} className="glass-button">
                 View Board
               </button>
               <button onClick={() => useGameStore.getState().resetGame()} className="glass-button">
@@ -313,6 +347,16 @@ export default function App() {
                 Main Menu
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {(gamePhase === 'won' || gamePhase === 'draw') && reviewMode && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
+          <div className="glass-panel px-5 py-3 flex items-center gap-4">
+            <span className="panel-label">Reviewing final board</span>
+            <button onClick={() => useGameStore.getState().resetGame()} className="glass-button text-sm">Play Again</button>
+            <button onClick={() => useGameStore.setState({ gamePhase: 'menu' })} className="glass-button text-sm">Main Menu</button>
           </div>
         </div>
       )}
