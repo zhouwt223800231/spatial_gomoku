@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
+import { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../store/gameStore';
 import { Position } from '../types';
@@ -7,16 +8,24 @@ import { GhostStone } from './GhostStone';
 import { VictoryCelebration } from './VictoryCelebration';
 
 interface Board3DProps {
-  onCellLock?: (pos: Position) => void;
-  onCellPlace?: (pos: Position) => void;
+  onCellSelect?: (pos: Position) => void;
 }
 
 const clampCell = (v: number, max: number) => Math.max(0, Math.min(max, v));
+const DRAG_THRESHOLD_PX = 6;
 
-export function Board3D({ onCellLock, onCellPlace }: Board3DProps) {
+const AXIS_TICK_COLORS: Record<'x' | 'y' | 'z', string> = {
+  x: '#67e8f9',
+  y: '#60a5fa',
+  z: '#a78bfa',
+};
+
+export function Board3D({ onCellSelect }: Board3DProps) {
   const { stones, boardSize, ghostPosition, winLine, activeLayer, sliceAxis } = useGameStore();
   const [cursorCell, setCursorCell] = useState<Position | null>(null);
   const offset = (boardSize - 1) / 2;
+
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // The layer currently being "previewed": the ghost layer when aiming, otherwise the browsed layer.
   const focusLayer = ghostPosition ? ghostPosition.z : activeLayer;
@@ -26,6 +35,22 @@ export function Board3D({ onCellLock, onCellPlace }: Board3DProps) {
     y: clampCell(Math.round(point.y + offset), boardSize - 1),
     z: activeLayer,
   });
+
+  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+    dragStartRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
+  };
+
+  const handleClick = (e: ThreeEvent<MouseEvent>, pos: Position) => {
+    const start = dragStartRef.current;
+    dragStartRef.current = null;
+    // Ignore clicks that are actually part of a drag (view rotation).
+    if (start) {
+      const dx = e.nativeEvent.clientX - start.x;
+      const dy = e.nativeEvent.clientY - start.y;
+      if (Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) return;
+    }
+    onCellSelect?.(pos);
+  };
 
   const gridGeometry = useMemo(() => {
     const positions: number[] = [];
@@ -40,6 +65,35 @@ export function Board3D({ onCellLock, onCellPlace }: Board3DProps) {
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    return geo;
+  }, [boardSize, offset]);
+
+  // Axis coordinate ticks: short colored marks + (rendered separately) labels.
+  const tickGeometry = useMemo(() => {
+    const positions: number[] = [];
+    const colors: number[] = [];
+    const ext = boardSize / 2 + 0.25;
+    const inset = offset;
+    const push = (a: number, b: number, c: number, color: string) => {
+      positions.push(a, b, c);
+      const col = new THREE.Color(color);
+      colors.push(col.r, col.g, col.b);
+    };
+    for (let i = 0; i < boardSize; i++) {
+      const v = i - offset;
+      // X axis ticks at fixed Y/Z edges
+      push(-ext, -inset, -inset, AXIS_TICK_COLORS.x); push(-ext + 0.3, -inset, -inset, AXIS_TICK_COLORS.x);
+      push(ext - 0.3, -inset, -inset, AXIS_TICK_COLORS.x); push(ext, -inset, -inset, AXIS_TICK_COLORS.x);
+      // Y axis ticks
+      push(-inset, -ext, -inset, AXIS_TICK_COLORS.y); push(-inset, -ext + 0.3, -inset, AXIS_TICK_COLORS.y);
+      push(-inset, ext - 0.3, -inset, AXIS_TICK_COLORS.y); push(-inset, ext, -inset, AXIS_TICK_COLORS.y);
+      // Z axis ticks
+      push(-inset, -inset, -ext, AXIS_TICK_COLORS.z); push(-inset, -inset, -ext + 0.3, AXIS_TICK_COLORS.z);
+      push(-inset, -inset, ext - 0.3, AXIS_TICK_COLORS.z); push(-inset, -inset, ext, AXIS_TICK_COLORS.z);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     return geo;
   }, [boardSize, offset]);
 
@@ -84,6 +138,11 @@ export function Board3D({ onCellLock, onCellPlace }: Board3DProps) {
         <lineBasicMaterial color="#38bdf8" transparent opacity={0.85} depthWrite={false} />
       </lineSegments>
 
+      {/* Axis coordinate ticks */}
+      <lineSegments geometry={tickGeometry} raycast={() => null} renderOrder={-1}>
+        <lineBasicMaterial vertexColors transparent opacity={0.8} depthWrite={false} />
+      </lineSegments>
+
       {/* Full 3D grid (dimmed, gives spatial context) */}
       <lineSegments geometry={gridGeometry} raycast={() => null} renderOrder={-1}>
         <lineBasicMaterial color="#7dd3fc" transparent opacity={0.13} depthWrite={false} />
@@ -112,8 +171,9 @@ export function Board3D({ onCellLock, onCellPlace }: Board3DProps) {
         position={[0, 0, activeLayer - offset]}
         onPointerMove={(e) => { e.stopPropagation(); setCursorCell(pointToCell(e.point)); }}
         onPointerOut={() => setCursorCell(null)}
-        onContextMenu={(e) => { e.stopPropagation(); onCellLock?.(pointToCell(e.point)); }}
-        onClick={(e) => { e.stopPropagation(); onCellPlace?.(pointToCell(e.point)); }}
+        onPointerDown={(e) => { e.stopPropagation(); handlePointerDown(e); }}
+        onContextMenu={(e) => { e.stopPropagation(); onCellSelect?.(pointToCell(e.point)); }}
+        onClick={(e) => { e.stopPropagation(); handleClick(e, pointToCell(e.point)); }}
       >
         <planeGeometry args={[boardSize, boardSize]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />

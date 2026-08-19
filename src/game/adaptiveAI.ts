@@ -14,30 +14,30 @@ export function getAdaptiveWeights(profile: PlayerProfile, gameCount: number): {
   } else if (winRate < 0.3) {
     maxDepth = 2;
     weights.ATTACK = 0.8;
-    insight = 'AI lowered difficulty to give you more room to practice';
+    insight = 'Observed: you win less than 30% — AI playing at a gentler setting';
   }
 
   const zVuln = profile.vulnerabilities.find(v => v.direction === 'Z_AXIS');
   if (zVuln && zVuln.exposureRate > 0.5) {
     weights.Z_AXIS = 50;
-    insight = 'AI detected weak Z-axis defense, strengthening vertical attack';
+    insight = 'Observed: you rarely use the Z axis — AI weights vertical lines higher';
   }
 
   const diagVuln = profile.vulnerabilities.find(v => v.direction === 'DIAGONAL');
   if (diagVuln && diagVuln.exposureRate > 0.5) {
     weights.DIAGONAL = 30;
-    if (!insight) insight = 'AI is adjusting strategy to counter your diagonal play';
+    if (!insight) insight = 'Observed: you play few diagonals — AI weights diagonals higher';
   }
 
   if (profile.style.aggressiveness > 0.7) {
     weights.DEFENSE = 1.3;
     weights.ATTACK = 0.7;
-    if (!insight) insight = 'AI is strengthening defense against your aggressive style';
+    if (!insight) insight = 'Observed: your moves are aggressive — AI weights defense higher';
   }
 
   if (profile.style.patternConsistency > 0.8 && gameCount > 5) {
     weights.PATTERN_BREAK = 2.0;
-    if (!insight) insight = 'AI detected your fixed pattern, preparing to break it';
+    if (!insight) insight = 'Observed: your opening patterns repeat — AI adds pattern-break weight';
   }
 
   return { weights, maxDepth, insight };

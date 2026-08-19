@@ -20,6 +20,7 @@ export function CameraController() {
   const boardSize = useGameStore((s) => s.boardSize);
   const resetViewTick = useGameStore((s) => s.resetViewTick);
   const winLine = useGameStore((s) => s.winLine);
+  const celebrationDismissed = useGameStore((s) => s.celebrationDismissed);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const phaseStartRef = useRef<number | null>(null);
   const approachStartPosRef = useRef<THREE.Vector3 | null>(null);
@@ -69,6 +70,15 @@ export function CameraController() {
     controls.enablePan = false;
     controls.enableZoom = true;
     controls.enableRotate = true;
+    controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.PAN,
+    };
+    controls.touches = {
+      ONE: THREE.TOUCH.ROTATE,
+      TWO: THREE.TOUCH.DOLLY_PAN,
+    };
     controls.minDistance = 3;
     controls.maxDistance = boardSize * 3;
     controls.target.set(0, 0, 0);
@@ -93,7 +103,7 @@ export function CameraController() {
 
   useFrame((state) => {
     const controls = controlsRef.current;
-    const celebrating = gamePhase === 'won' && !!winLine && winLine.positions.length >= 2;
+    const celebrating = gamePhase === 'won' && !!winLine && winLine.positions.length >= 2 && !celebrationDismissed;
 
     if (celebrating) {
       if (phaseStartRef.current === null) {
@@ -157,7 +167,10 @@ export function CameraController() {
       phaseStartRef.current = null;
       approachStartPosRef.current = null;
       orbitDoneRef.current = false;
-      controls?.update();
+      if (controls) {
+        controls.enabled = true;
+        controls.update();
+      }
     }
   });
 

@@ -9,6 +9,7 @@ interface GameState {
   currentPlayer: Player;
   gamePhase: GamePhase;
   gameMode: GameMode;
+  humanPlayer: Player;
   winner: Player | null;
   winLine: WinLineData | null;
   ghostPosition: Position | null;
@@ -22,9 +23,11 @@ interface GameState {
   movesCount: number;
   lastMove: Position | null;
   victoryChimePlayed: boolean;
+  celebrationDismissed: boolean;
 
   setBoardSize: (size: BoardSize) => void;
   setGameMode: (mode: GameMode) => void;
+  setHumanPlayer: (player: Player) => void;
   startGame: () => void;
   placeStone: (position: Position) => void;
   setGhostPosition: (pos: Position | null) => void;
@@ -37,6 +40,7 @@ interface GameState {
   setGamePhase: (phase: GamePhase) => void;
   setWinner: (winner: Player | null) => void;
   setAiThinking: (thinking: boolean) => void;
+  setCelebrationDismissed: (dismissed: boolean) => void;
   addAiInsight: (insight: AIInsight) => void;
   clearAiInsights: () => void;
   resetGame: () => void;
@@ -51,6 +55,7 @@ const createInitialState = () => ({
   currentPlayer: 'black' as Player,
   gamePhase: 'menu' as GamePhase,
   gameMode: 'pvp' as GameMode,
+  humanPlayer: 'black' as Player,
   winner: null as Player | null,
   winLine: null as WinLineData | null,
   ghostPosition: null as Position | null,
@@ -64,6 +69,7 @@ const createInitialState = () => ({
   movesCount: 0,
   lastMove: null as Position | null,
   victoryChimePlayed: false,
+  celebrationDismissed: false,
 });
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -72,11 +78,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   setBoardSize: (size) => set({ boardSize: size, activeLayer: centerOf(size) }),
   setGameMode: (mode) => set({ gameMode: mode }),
 
+  setHumanPlayer: (player) => set({ humanPlayer: player }),
+
   startGame: () => set((state) => ({
     ...createInitialState(),
     gameMode: state.gameMode,
     boardSize: state.boardSize,
+    humanPlayer: state.humanPlayer,
     activeLayer: centerOf(state.boardSize),
+    currentPlayer: state.gameMode === 'ai' && state.humanPlayer === 'white' ? 'white' : 'black',
     gamePhase: 'playing',
   })),
 
@@ -108,6 +118,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   setGamePhase: (phase) => set({ gamePhase: phase }),
   setWinner: (winner) => set({ winner }),
   setAiThinking: (thinking) => set({ aiThinking: thinking }),
+  setCelebrationDismissed: (dismissed) => set({ celebrationDismissed: dismissed }),
   addAiInsight: (insight) => set((state) => ({ aiInsights: [...state.aiInsights.slice(-4), insight] })),
   clearAiInsights: () => set({ aiInsights: [] }),
 
@@ -115,7 +126,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     ...createInitialState(),
     gameMode: get().gameMode,
     boardSize: get().boardSize,
+    humanPlayer: get().humanPlayer,
     activeLayer: centerOf(get().boardSize),
+    currentPlayer: get().gameMode === 'ai' && get().humanPlayer === 'white' ? 'white' : 'black',
   }),
 
   undoMove: () => set((state) => {

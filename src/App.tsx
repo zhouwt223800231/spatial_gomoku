@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { useGameStore } from './store/gameStore';
-import { Position } from './types';
+import { Position, Player } from './types';
 import { checkWin, isDraw } from './game/rules';
 import { findBestMove } from './game/ai';
 import { getAdaptiveWeights } from './game/adaptiveAI';
@@ -9,6 +9,7 @@ import { usePlayerProfile } from './hooks/usePlayerProfile';
 import { useAudio } from './hooks/useAudio';
 import { Board3D } from './components/Board3D';
 import { CameraController } from './components/CameraController';
+import { AxisGizmo } from './components/AxisGizmo';
 import { WebGLDiagnostic } from './components/WebGLDiagnostic';
 import { Starfield } from './components/Starfield';
 import { LiveLines } from './components/LiveLines';
@@ -29,8 +30,6 @@ const KEYMAP: Record<'xNeg' | 'xPos' | 'yNeg' | 'yPos' | 'zNeg' | 'zPos' | 'conf
   cancel: ['escape'],
 };
 
-const DOUBLE_CLICK_MS = 350;
-
 export default function App() {
   const {
     gamePhase,
@@ -38,12 +37,13 @@ export default function App() {
     currentPlayer,
     boardSize,
     gameMode,
+    humanPlayer,
     placeStone,
     setGhostPosition,
     setActiveLayer,
     setSliceAxis,
-    viewMode,
     setViewMode,
+    viewMode,
     requestOverview,
     setWinLine,
     setGamePhase,
@@ -56,14 +56,14 @@ export default function App() {
 
   const { profile, recordMove, recordGame } = usePlayerProfile();
   const { init, playPlaceSound, playVictoryChime, cancelVictoryChime } = useAudio();
-  const aiTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const aiPlayer: Player = humanPlayer === 'black' ? 'white' : 'black';
   const fineModeRef = useRef(false);
-  const lastLockTimeRef = useRef(0);
 
   const placeAt = useCallback((pos: Position) => {
     const st = useGameStore.getState();
     if (st.gamePhase !== 'playing') return;
-    if (st.gameMode === 'ai' && st.currentPlayer === 'white') return;
+    const ai = st.humanPlayer === 'black' ? 'white' as Player : 'black' as Player;
+    if (st.gameMode === 'ai' && st.currentPlayer === ai) return;
     const occupied = st.stones.some(s => s.position.x === pos.x && s.position.y === pos.y && s.position.z === pos.z);
     if (occupied) return;
     st.placeStone(pos);
@@ -79,39 +79,37 @@ export default function App() {
     if (pos) placeAt(pos);
   }, [placeAt]);
 
-  const handleCellPlace = useCallback((pos: Position) => {
-    placeAt(pos);
-  }, [placeAt]);
+  const cancelPreview = useCallback(() => {
+    const st = useGameStore.getState();
+    st.setGhostPosition(null);
+    st.setSliceAxis('z');
+    fineModeRef.current = false;
+  }, []);
 
-  const handleCellLock = useCallback((pos: Position) => {
+  const handleCellSelect = useCallback((pos: Position) => {
     const st = useGameStore.getState();
     if (st.gamePhase !== 'playing') return;
-    if (st.gameMode === 'ai' && st.currentPlayer === 'white') return;
-    const now = performance.now();
-    const prev = st.ghostPosition;
-    if (prev && fineModeRef.current && now - lastLockTimeRef.current < DOUBLE_CLICK_MS) {
-      confirmPlace();
-    } else {
-      st.setGhostPosition(pos);
-      st.setActiveLayer(pos.z);
-      st.setSliceAxis('z');
-      fineModeRef.current = true;
-      lastLockTimeRef.current = now;
-    }
-  }, [confirmPlace]);
+    const ai = st.humanPlayer === 'black' ? 'white' as Player : 'black' as Player;
+    if (st.gameMode === 'ai' && st.currentPlayer === ai) return;
+    st.setGhostPosition(pos);
+    st.setActiveLayer(pos.z);
+    st.setSliceAxis('z');
+    fineModeRef.current = true;
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const st = useGameStore.getState();
       if (st.gamePhase !== 'playing') return;
-      if (st.gameMode === 'ai' && st.currentPlayer === 'white') return;
+      const ai = st.humanPlayer === 'black' ? 'white' as Player : 'black' as Player;
+      if (st.gameMode === 'ai' && st.currentPlayer === ai) return;
 
       const key = e.key.toLowerCase();
       const size = st.boardSize;
       const clamp = (v: number) => Math.max(0, Math.min(size - 1, v));
 
       // View controls (work regardless of a locked ghost)
-      if (key === '0' || key === 'f') { e.preventDefault(); st.requestOverview(); return; }
+      if (key === '0' || key === 'f' || key === 'r') { e.preventDefault(); st.requestOverview(); return; }
       if (key === 'o') { e.preventDefault(); st.setViewMode(st.viewMode === 'orthographic' ? 'perspective' : 'orthographic'); return; }
 
       const move = (axis: 'x' | 'y' | 'z', delta: number) => {
@@ -136,11 +134,11 @@ export default function App() {
       else if (KEYMAP.zNeg.includes(key)) { move('z', -1); e.preventDefault(); }
       else if (KEYMAP.zPos.includes(key)) { move('z', 1); e.preventDefault(); }
       else if (KEYMAP.confirm.includes(key)) { e.preventDefault(); confirmPlace(); }
-      else if (KEYMAP.cancel.includes(key)) { e.preventDefault(); st.setGhostPosition(null); st.setSliceAxis('z'); fineModeRef.current = false; }
+      else if (KEYMAP.cancel.includes(key)) { e.preventDefault(); cancelPreview(); }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [confirmPlace]);
+  }, [confirmPlace, cancelPreview]);
 
   useEffect(() => {
     const onFirstGesture = () => {
@@ -170,43 +168,41 @@ export default function App() {
         playVictoryChime(win.positions, boardSize);
       }
 
-      const isPlayerWin = gameMode === 'ai' && win.player === 'black';
-      recordGame(isPlayerWin, gameMode === 'ai' && win.player === 'white', movesCount);
+      const st = useGameStore.getState();
+      const isPlayerWin = gameMode === 'ai' && win.player === st.humanPlayer;
+      recordGame(isPlayerWin, gameMode === 'ai' && win.player === (st.humanPlayer === 'black' ? 'white' : 'black'), movesCount);
     } else if (isDraw(stones, boardSize)) {
       setGamePhase('draw');
       recordGame(false, false, movesCount);
     }
-  }, [stones, boardSize]);
+  }, [stones, boardSize, gameMode, movesCount, recordGame]);
 
   useEffect(() => {
-    if (gameMode === 'ai' && currentPlayer === 'white' && gamePhase === 'playing') {
-      setAiThinking(true);
+    if (gameMode !== 'ai' || gamePhase !== 'playing') return;
+    const ai = humanPlayer === 'black' ? 'white' as Player : 'black' as Player;
+    if (currentPlayer !== ai) return;
 
-      aiTimeoutRef.current = setTimeout(() => {
-        const { weights, maxDepth, insight } = getAdaptiveWeights(profile, movesCount);
-        if (insight) {
-          addAiInsight({ id: Date.now().toString(), type: 'adapted', message: insight, timestamp: Date.now() });
-        }
-
-        const move = findBestMove(stones, 'white', boardSize, weights, maxDepth);
-        placeStone(move);
-        playPlaceSound(move, boardSize);
-        setAiThinking(false);
-      }, 800);
-
-      return () => clearTimeout(aiTimeoutRef.current);
+    setAiThinking(true);
+    const { weights, maxDepth, insight } = getAdaptiveWeights(profile, movesCount);
+    if (insight) {
+      addAiInsight({ id: Date.now().toString(), type: 'adapted', message: insight, timestamp: Date.now() });
     }
-  }, [currentPlayer, gameMode, gamePhase, stones, boardSize, profile, movesCount]);
+    const move = findBestMove(stones, ai, boardSize, weights, maxDepth);
+    placeStone(move);
+    playPlaceSound(move, boardSize);
+    setAiThinking(false);
+  }, [currentPlayer, gameMode, gamePhase, stones, boardSize, profile, movesCount, humanPlayer, placeStone, playPlaceSound, addAiInsight, setAiThinking]);
 
   useEffect(() => {
     if (gamePhase === 'playing') {
       clearAiInsights();
     }
-  }, [gamePhase]);
+  }, [gamePhase, clearAiInsights]);
 
   useEffect(() => () => { cancelVictoryChime(); }, [cancelVictoryChime]);
 
   const winner = useGameStore.getState().winner;
+  const dismissCelebration = () => useGameStore.getState().setCelebrationDismissed(true);
 
   return (
     <div className="w-screen h-screen relative space-bg" onContextMenu={(e) => e.preventDefault()}>
@@ -225,7 +221,8 @@ export default function App() {
         <pointLight position={[-5, -5, -5]} intensity={0.25} color="#3b82f6" />
 
         <Starfield />
-        <Board3D onCellLock={handleCellLock} onCellPlace={handleCellPlace} />
+        <AxisGizmo />
+        <Board3D onCellSelect={handleCellSelect} />
         {gamePhase === 'playing' && <LiveLines />}
         <CameraController />
         <WebGLDiagnostic />
@@ -235,7 +232,7 @@ export default function App() {
 
       {gamePhase === 'playing' && (
         <>
-          <GameHUD />
+          <GameHUD onConfirm={confirmPlace} onCancel={cancelPreview} />
           <StrategyRadar />
           <ProjectionMinimap />
           {gameMode === 'ai' && <AIInsight />}
@@ -253,6 +250,9 @@ export default function App() {
               Five in a row in 3D space
             </p>
             <div className="flex gap-3 justify-center">
+              <button onClick={dismissCelebration} className="glass-button victory-btn">
+                View Board
+              </button>
               <button onClick={() => useGameStore.getState().resetGame()} className="glass-button victory-btn">
                 Play Again
               </button>
@@ -269,9 +269,17 @@ export default function App() {
           <div className="text-center">
             <h2 className="text-5xl font-light text-white/60 mb-4">Draw</h2>
             <p className="text-white/40 mb-8">Board is full</p>
-            <button onClick={() => useGameStore.getState().resetGame()} className="glass-button">
-              Play Again
-            </button>
+            <div className="flex gap-3 justify-center">
+              <button onClick={() => useGameStore.setState({ gamePhase: 'won' })} className="glass-button">
+                View Board
+              </button>
+              <button onClick={() => useGameStore.getState().resetGame()} className="glass-button">
+                Play Again
+              </button>
+              <button onClick={() => useGameStore.setState({ gamePhase: 'menu' })} className="glass-button">
+                Main Menu
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,9 +1,16 @@
 import React from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { BoardSize } from '../../types';
+import { BoardSize, Player } from '../../types';
 
 export function Menu() {
-  const { setGameMode, startGame, setBoardSize, boardSize } = useGameStore();
+  const { setGameMode, startGame, setBoardSize, setHumanPlayer, boardSize, humanPlayer } = useGameStore();
+
+  const colorChoice = (c: Player) =>
+    `flex-1 py-2.5 rounded-xl border font-mono text-sm transition-all ${
+      humanPlayer === c
+        ? 'bg-cyan-400/15 border-cyan-200/50 text-cyan-100 shadow-glow-sm'
+        : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/75'
+    }`;
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-[#070b16]/55 backdrop-blur-sm overflow-y-auto py-8 px-4">
@@ -37,6 +44,14 @@ export function Menu() {
           </div>
 
           <div className="space-y-3">
+            <label className="panel-label">执子 · Your Color（人机模式）</label>
+            <div className="flex gap-2">
+              <button onClick={() => setHumanPlayer('black')} className={colorChoice('black')}>我执黑 · 先手</button>
+              <button onClick={() => setHumanPlayer('white')} className={colorChoice('white')}>我执白 · 后手</button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
             <button
               onClick={() => { setGameMode('pvp'); startGame(); }}
               className="w-full glass-button--primary text-lg font-light"
@@ -56,16 +71,16 @@ export function Menu() {
         <div className="glass-panel p-6 w-[21rem]">
           <h2 className="panel-label mb-4">使用说明 · How to Play</h2>
           <ul className="text-white/70 text-sm space-y-2.5 leading-relaxed">
-            <li><span className="text-cyan-200/80">左键点击</span>：在预览层直接落子</li>
-            <li><span className="text-cyan-200/80">右键点击</span>：瞄准格子并进入预览</li>
+            <li><span className="text-cyan-200/80">左键 / 右键点击</span>：选中格子进入预览（不落子）</li>
+            <li><span className="text-cyan-200/80">Enter / 空格 / 「落子」按钮</span>：确认落子</li>
+            <li><span className="text-cyan-200/80">Esc / 「取消」按钮</span>：取消预览</li>
             <li><span className="text-cyan-200/80">A / D</span>（或 ← / →）：沿 X 轴移动</li>
             <li><span className="text-cyan-200/80">W / S</span>（或 ↑ / ↓）：沿 Y 轴移动</li>
             <li><span className="text-cyan-200/80">Q / E</span>：沿 Z 轴切层</li>
-            <li><span className="text-cyan-200/80">Enter / 空格 / 双击右键</span>：确认落子</li>
-            <li><span className="text-cyan-200/80">Esc</span>：取消预览</li>
-            <li><span className="text-cyan-200/80">0 / F</span>：全局总览取景</li>
+            <li><span className="text-cyan-200/80">左键拖拽</span>：旋转视角 · <span className="text-cyan-200/80">滚轮</span>：缩放</li>
+            <li><span className="text-cyan-200/80">0 / F / R</span>：全局总览取景</li>
             <li><span className="text-cyan-200/80">O</span>：透视 / 正交视图切换</li>
-            <li className="text-white/40">左键拖拽旋转视角 · 滚轮缩放</li>
+            <li className="text-white/40">提示：预览格为彩色 ghost，红色表示该格已被占用</li>
           </ul>
         </div>
       </div>

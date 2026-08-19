@@ -1,15 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { Position } from '../../types';
 
 const fmt = (p: Position | null) => (p ? `(${p.x + 1}, ${p.y + 1}, ${p.z + 1})` : '—');
 
-export function GameHUD() {
+interface GameHUDProps {
+  onConfirm?: () => void;
+  onCancel?: () => void;
+}
+
+export function GameHUD({ onConfirm, onCancel }: GameHUDProps) {
   const {
     currentPlayer, movesCount, gameMode, aiThinking, resetGame, undoMove, stones,
     activeLayer, boardSize, setActiveLayer, showLines, setShowLines, viewMode, setViewMode, requestOverview,
     ghostPosition, lastMove,
   } = useGameStore();
+  const [showInfo, setShowInfo] = useState(false);
 
   return (
     <>
@@ -41,49 +47,73 @@ export function GameHUD() {
         </div>
       </div>
 
-      {/* Top Right - Game Info + View controls */}
+      {/* Top Right - Game Info + View controls (collapsible) */}
       <div className="absolute top-6 right-6 z-10">
-        <div className="glass-panel p-5 min-w-[190px] space-y-3">
-          <div className="flex justify-between text-sm">
-            <span className="text-white/40">Mode</span>
-            <span className="mono-num text-white/85">{gameMode === 'ai' ? 'AI' : 'Local'}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-white/40">Moves</span>
-            <span className="mono-num text-white/85">{movesCount}</span>
-          </div>
-          <div className="flex items-center justify-between gap-2 text-sm">
-            <button
-              onClick={() => setActiveLayer(Math.max(0, activeLayer - 1))}
-              disabled={activeLayer === 0}
-              className="glass-button px-2 py-1 text-xs disabled:opacity-30"
-            >&#9664;</button>
-            <span className="mono-num text-white/85 whitespace-nowrap">Layer {activeLayer + 1}/{boardSize}</span>
-            <button
-              onClick={() => setActiveLayer(Math.min(boardSize - 1, activeLayer + 1))}
-              disabled={activeLayer === boardSize - 1}
-              className="glass-button px-2 py-1 text-xs disabled:opacity-30"
-            >&#9654;</button>
-          </div>
-          <div className="flex gap-2 pt-1">
-            <button
-              onClick={() => setShowLines(!showLines)}
-              className={`flex-1 px-2 py-1.5 rounded-lg border text-xs transition-all ${
-                showLines ? 'bg-cyan-400/15 border-cyan-200/50 text-cyan-100' : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
-              }`}
-            >
-              Lines {showLines ? 'On' : 'Off'}
-            </button>
-            <button onClick={requestOverview} className="flex-1 glass-button px-2 py-1.5 text-xs">Overview</button>
-            <button
-              onClick={() => setViewMode(viewMode === 'orthographic' ? 'perspective' : 'orthographic')}
-              className="flex-1 glass-button px-2 py-1.5 text-xs"
-            >
-              {viewMode === 'orthographic' ? '3D' : '2D'}
-            </button>
-          </div>
+        <div className="glass-panel p-3">
+          <button
+            onClick={() => setShowInfo(!showInfo)}
+            className="w-full text-left panel-label px-1 py-0.5 flex justify-between items-center"
+          >
+            <span>Controls</span>
+            <span className="text-white/50">{showInfo ? '▾' : '▸'}</span>
+          </button>
+          {showInfo && (
+            <div className="p-2 space-y-3 min-w-[190px]">
+              <div className="flex justify-between text-sm">
+                <span className="text-white/40">Mode</span>
+                <span className="mono-num text-white/85">{gameMode === 'ai' ? 'AI' : 'Local'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-white/40">Moves</span>
+                <span className="mono-num text-white/85">{movesCount}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <button
+                  onClick={() => setActiveLayer(Math.max(0, activeLayer - 1))}
+                  disabled={activeLayer === 0}
+                  className="glass-button px-2 py-1 text-xs disabled:opacity-30"
+                >&#9664;</button>
+                <span className="mono-num text-white/85 whitespace-nowrap">Layer {activeLayer + 1}/{boardSize}</span>
+                <button
+                  onClick={() => setActiveLayer(Math.min(boardSize - 1, activeLayer + 1))}
+                  disabled={activeLayer === boardSize - 1}
+                  className="glass-button px-2 py-1 text-xs disabled:opacity-30"
+                >&#9654;</button>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setShowLines(!showLines)}
+                  className={`flex-1 px-2 py-1.5 rounded-lg border text-xs transition-all ${
+                    showLines ? 'bg-cyan-400/15 border-cyan-200/50 text-cyan-100' : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
+                  }`}
+                >
+                  Lines {showLines ? 'On' : 'Off'}
+                </button>
+                <button onClick={requestOverview} className="flex-1 glass-button px-2 py-1.5 text-xs">Overview</button>
+                <button
+                  onClick={() => setViewMode(viewMode === 'orthographic' ? 'perspective' : 'orthographic')}
+                  className="flex-1 glass-button px-2 py-1.5 text-xs"
+                >
+                  {viewMode === 'orthographic' ? '3D' : '2D'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Confirm / Cancel overlay when a ghost is selected */}
+      {ghostPosition && (
+        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20">
+          <div className="glass-panel px-5 py-3 flex items-center gap-4">
+            <span className="mono-num text-[12px] text-white/70">
+              Place at <span className="accent-glow">{fmt(ghostPosition)}</span>
+            </span>
+            <button onClick={onConfirm} className="glass-button--primary px-4 py-1.5 text-sm">✓ 落子 (Enter)</button>
+            <button onClick={onCancel} className="glass-button px-4 py-1.5 text-sm">✕ 取消 (Esc)</button>
+          </div>
+        </div>
+      )}
 
       {/* Bottom - Controls */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex gap-3">
