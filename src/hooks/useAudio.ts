@@ -40,18 +40,15 @@ export function useAudio() {
     synthRef.current.triggerAttackRelease(['C4', 'E4', 'G4', 'C5'], '2n');
   }, []);
 
-  // Pentatonic chimes (C5 D5 E5 G5 A5) aligned with the per-stone ignition
-  // (0.45s apart, last stone at 1.8s), then a final C-major chord.
-  // Each note's duration covers decay + release so the tail rings out naturally.
+  // Pentatonic chimes (C5 D5 E5 G5 A5) aligned with the per-stone ignition.
+  // No final chord; each note rings out naturally (duration covers decay+release).
   const playVictoryChime = useCallback(() => {
     if (!chimeSynthRef.current) return;
     const synth = chimeSynthRef.current;
     const IGNITE_END = 1.8;
     const step = IGNITE_END / 4;
     const scale = ['C5', 'D5', 'E5', 'G5', 'A5'];
-    const chord = ['C5', 'E5', 'G5', 'C6'];
     const NOTE_RING = 4.5;
-    const CHORD_RING = 5.0;
 
     Tone.Transport.cancel(0);
     scale.forEach((note, i) => {
@@ -59,18 +56,15 @@ export function useAudio() {
         synth.triggerAttackRelease(note, NOTE_RING, time);
       }, i * step);
     });
-    Tone.Transport.schedule((time) => {
-      chord.forEach((n) => synth.triggerAttackRelease(n, CHORD_RING, time));
-    }, IGNITE_END + 0.1);
 
     Tone.Transport.stop();
     Tone.Transport.position = 0;
     Tone.Transport.start();
-    // Reset the transport only after the chord tail has fully rung out.
+    // Reset the transport only after the last note's tail has fully rung out.
     window.setTimeout(() => {
       Tone.Transport.stop();
       Tone.Transport.cancel(0);
-    }, 6600);
+    }, 6500);
   }, []);
 
   const cancelVictoryChime = useCallback(() => {

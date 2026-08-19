@@ -2,7 +2,7 @@ import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-const IGNITE_END = 1.8;      // energy pulse reaches the last stone
+const IGNITE_END = 1.8;      // both pulse heads reach the two endpoints
 
 interface VictoryCelebrationProps {
   positions: [number, number, number][];
@@ -15,46 +15,75 @@ export function VictoryCelebration({ positions, player }: VictoryCelebrationProp
 
   const startRef = useRef<number | null>(null);
   const stonesRef = useRef<(THREE.Mesh | null)[]>([]);
-  const pulseRef = useRef<THREE.Mesh | null>(null);
-  const lineGeoRef = useRef<THREE.BufferGeometry | null>(null);
+  const segsRef = useRef<(THREE.Line | null)[]>([]);
+  const headLeftRef = useRef<THREE.Mesh | null>(null);
+  const headRightRef = useRef<THREE.Mesh | null>(null);
 
-  const line = useMemo(() => {
-    const pts = positions.map((p) => new THREE.Vector3(...p));
-    const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.35, depthTest: false, depthWrite: false });
-    return new THREE.Line(geo, mat);
-  }, [positions, color]);
+  const n = positions.length;
+  const segCount = n - 1;
+  const centerIdx = segCount / 2;      // stone index of the center (e.g. 2 for 5 stones)
+  const maxDist = Math.max(centerIdx, segCount - centerIdx); // normalized distance (e.g. 2)
 
-  const segCount = positions.length - 1;
+  // Line built from independent segments so opacity can be animated per segment
+  // from the center outward (both ends reveal last, simultaneously).
+  const segments = useMemo(() => {
+    return Array.from({ length: segCount }, (_, i) => {
+      const a = new THREE.Vector3(...positions[i]);
+      const b = new THREE.Vector3(...positions[i + 1]);
+      const geo = new THREE.BufferGeometry().setFromPoints([a, b]);
+      const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
+      return new THREE.Line(geo, mat);
+    });
+  }, [positions, segCount, color]);
+
+  const centerVec = useMemo(() => {
+    const a = new THREE.Vector3(...positions[Math.floor(centerIdx)]);
+    const b = new THREE.Vector3(...positions[Math.ceil(centerIdx)]);
+    return a.clone().add(b).multiplyScalar(0.5);
+  }, [positions, centerIdx]);
+
+  const leftEnd = useMemo(() => new THREE.Vector3(...positions[0]), [positions]);
+  const rightEnd = useMemo(() => new THREE.Vector3(...positions[n - 1]), [positions, n]);
+
+  // Symmetric reveal: 0 at p=0 for center, ramps so both ends finish together at p=1.
+  const reveal = (p: number, dist: number) => {
+    const start = dist / maxDist / 2;
+    return Math.max(0, Math.min(1, (p - start) / (1 - start || 1)));
+  };
 
   useFrame((state) => {
     if (startRef.current === null) startRef.current = state.clock.elapsedTime;
     const t = state.clock.elapsedTime - startRef.current;
     const progress = Math.min(1, t / IGNITE_END);
 
-    // Line grows progressively from the first stone to the last.
-    if (lineGeoRef.current) {
-      const drawCount = Math.round(progress * segCount) + 1;
-      lineGeoRef.current.setDrawRange(0, drawCount);
-      lineGeoRef.current.attributes.position.needsUpdate = true;
+    // Line segments appear from the center toward both ends.
+    segsRef.current.forEach((seg, i) => {
+      if (!seg) return;
+      const midIdx = i + 0.5;
+      const dist = Math.abs(midIdx - centerIdx);
+      const mat = seg.material as THREE.LineBasicMaterial;
+      mat.opacity = 0.35 * reveal(progress, dist);
+    });
+
+    // Two pulse heads travel from the center to both endpoints, arriving together.
+    if (headLeftRef.current) {
+      const q = reveal(progress, maxDist);
+      headLeftRef.current.position.lerpVectors(centerVec, leftEnd, q);
+      const m = headLeftRef.current.material as THREE.MeshBasicMaterial;
+      m.opacity = 0.95 * (progress >= 1 ? Math.max(0, 1 - (t - IGNITE_END) / 0.3) : 1);
+    }
+    if (headRightRef.current) {
+      const q = reveal(progress, maxDist);
+      headRightRef.current.position.lerpVectors(centerVec, rightEnd, q);
+      const m = headRightRef.current.material as THREE.MeshBasicMaterial;
+      m.opacity = 0.95 * (progress >= 1 ? Math.max(0, 1 - (t - IGNITE_END) / 0.3) : 1);
     }
 
-    // energy pulse travels along the line, synced to the growing tip
-    if (pulseRef.current) {
-      const idxF = progress * segCount;
-      const i = Math.min(segCount - 1, Math.floor(idxF));
-      const f = idxF - i;
-      const a = new THREE.Vector3(...positions[i]);
-      const b = new THREE.Vector3(...positions[i + 1]);
-      pulseRef.current.position.lerpVectors(a, b, f);
-      const pmat = pulseRef.current.material as THREE.MeshBasicMaterial;
-      pmat.opacity = 0.95 * (progress >= 1 ? Math.max(0, 1 - (t - IGNITE_END) / 0.3) : 1);
-    }
-
-    // stones ignite sequentially
+    // Stones ignite symmetrically: center first, both ends last and together.
     stonesRef.current.forEach((mesh, i) => {
       if (!mesh) return;
-      const igniteAt = i / segCount;
+      const dist = Math.abs(i - centerIdx);
+      const igniteAt = dist / maxDist / 2;
       const local = (progress - igniteAt) / 0.22;
       const mat = mesh.material as THREE.MeshStandardMaterial;
       if (local <= 0) {
@@ -73,7 +102,9 @@ export function VictoryCelebration({ positions, player }: VictoryCelebrationProp
 
   return (
     <group>
-      <primitive object={line} ref={(obj: THREE.Line | null) => { lineGeoRef.current = obj?.geometry ?? null; }} />
+      {segments.map((seg, i) => (
+        <primitive key={i} object={seg} ref={(obj: THREE.Line | null) => { segsRef.current[i] = obj; }} />
+      ))}
 
       {positions.map((p, i) => (
         <mesh
@@ -97,8 +128,12 @@ export function VictoryCelebration({ positions, player }: VictoryCelebrationProp
         </mesh>
       ))}
 
-      {/* travelling energy pulse */}
-      <mesh ref={pulseRef} raycast={() => null}>
+      {/* two travelling energy heads (left + right) */}
+      <mesh ref={headLeftRef} position={centerVec} raycast={() => null}>
+        <sphereGeometry args={[0.22, 16, 16]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.95} depthTest={false} depthWrite={false} />
+      </mesh>
+      <mesh ref={headRightRef} position={centerVec} raycast={() => null}>
         <sphereGeometry args={[0.22, 16, 16]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.95} depthTest={false} depthWrite={false} />
       </mesh>
