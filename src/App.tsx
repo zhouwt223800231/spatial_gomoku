@@ -55,7 +55,7 @@ export default function App() {
   } = useGameStore();
 
   const { profile, recordMove, recordGame } = usePlayerProfile();
-  const { init, playPlaceSound, playWinSound } = useAudio();
+  const { init, playPlaceSound, playVictoryChime, cancelVictoryChime } = useAudio();
   const aiTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const fineModeRef = useRef(false);
   const lastLockTimeRef = useRef(0);
@@ -165,7 +165,10 @@ export default function App() {
       setWinLine(win);
       setWinner(win.player);
       setGamePhase('won');
-      playWinSound();
+      if (!useGameStore.getState().victoryChimePlayed) {
+        useGameStore.setState({ victoryChimePlayed: true });
+        playVictoryChime();
+      }
 
       const isPlayerWin = gameMode === 'ai' && win.player === 'black';
       recordGame(isPlayerWin, gameMode === 'ai' && win.player === 'white', movesCount);
@@ -200,6 +203,8 @@ export default function App() {
       clearAiInsights();
     }
   }, [gamePhase]);
+
+  useEffect(() => () => { cancelVictoryChime(); }, [cancelVictoryChime]);
 
   const winner = useGameStore.getState().winner;
 

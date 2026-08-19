@@ -21,6 +21,7 @@ interface GameState {
   aiInsights: AIInsight[];
   movesCount: number;
   lastMove: Position | null;
+  victoryChimePlayed: boolean;
 
   setBoardSize: (size: BoardSize) => void;
   setGameMode: (mode: GameMode) => void;
@@ -62,6 +63,7 @@ const createInitialState = () => ({
   aiInsights: [] as AIInsight[],
   movesCount: 0,
   lastMove: null as Position | null,
+  victoryChimePlayed: false,
 });
 
 export const useGameStore = create<GameState>((set, get) => ({

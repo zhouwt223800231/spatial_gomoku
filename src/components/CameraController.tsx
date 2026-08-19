@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../store/gameStore';
 
 const ORBIT_DURATION = 3.0;
+const ORBIT_ANGLE = Math.PI / 4; // fixed 45° inclination to the winning line
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
@@ -17,6 +18,7 @@ export function CameraController() {
   const winLine = useGameStore((s) => s.winLine);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const orbitStartRef = useRef<number | null>(null);
+  const orbitStartAzimuthRef = useRef<number | null>(null);
   const orbitDoneRef = useRef(false);
 
   // Fit the whole board into view whenever size / view / overview changes.
@@ -80,6 +82,7 @@ export function CameraController() {
   useEffect(() => {
     if (gamePhase !== 'won') {
       orbitStartRef.current = null;
+      orbitStartAzimuthRef.current = null;
       orbitDoneRef.current = false;
     }
   }, [gamePhase]);
@@ -89,7 +92,10 @@ export function CameraController() {
     const orbiting = gamePhase === 'won' && !!winLine && winLine.positions.length >= 2;
 
     if (orbiting) {
-      if (orbitStartRef.current === null) orbitStartRef.current = state.clock.elapsedTime;
+      if (orbitStartRef.current === null) {
+        orbitStartRef.current = state.clock.elapsedTime;
+        orbitStartAzimuthRef.current = null;
+      }
       const t = state.clock.elapsedTime - orbitStartRef.current;
       const offset = (boardSize - 1) / 2;
       const a = new THREE.Vector3(
@@ -104,19 +110,36 @@ export function CameraController() {
       const lineLen = dir.length();
       dir.normalize();
       const up = new THREE.Vector3(0, 1, 0);
-      let u = new THREE.Vector3().crossVectors(dir, up);
-      if (u.lengthSq() < 0.001) u = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(1, 0, 0));
-      u.normalize();
-      const v = new THREE.Vector3().crossVectors(dir, u).normalize();
+      let h = new THREE.Vector3().crossVectors(dir, up);
+      if (h.lengthSq() < 0.001) h = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(1, 0, 0));
+      h.normalize();
+      const v = new THREE.Vector3().crossVectors(dir, h).normalize();
+
+      // Orbit basis: radial keeps a fixed 45° inclination to the line,
+      // tangent rotates around the line direction.
+      const radial = h.clone().multiplyScalar(Math.cos(ORBIT_ANGLE))
+        .add(v.clone().multiplyScalar(Math.sin(ORBIT_ANGLE)));
+      const tangent = new THREE.Vector3().crossVectors(dir, radial).normalize();
+
+      // Pick the orbit start azimuth so the camera keeps its current position
+      // (no jump when the orbit begins).
+      if (orbitStartAzimuthRef.current === null) {
+        const camOff = camera.position.clone().sub(mid);
+        const projH = camOff.dot(h);
+        const projV = camOff.dot(v);
+        const projLen = Math.hypot(projH, projV);
+        orbitStartAzimuthRef.current = projLen > 1e-4 ? Math.atan2(projV, projH) : 0;
+      }
+
       const radius = lineLen * 0.6 + 3;
 
       if (!orbitDoneRef.current && t <= ORBIT_DURATION) {
         if (controls) controls.enabled = false;
         const p = easeInOut(Math.min(1, t / ORBIT_DURATION));
-        const angle = p * Math.PI * 2;
+        const angle = orbitStartAzimuthRef.current + p * Math.PI * 2;
         const pos = mid.clone()
-          .add(u.clone().multiplyScalar(Math.cos(angle) * radius))
-          .add(v.clone().multiplyScalar(Math.sin(angle) * radius));
+          .add(radial.clone().multiplyScalar(Math.cos(angle) * radius))
+          .add(tangent.clone().multiplyScalar(Math.sin(angle) * radius));
         camera.position.copy(pos);
         camera.lookAt(mid);
       } else {
@@ -129,6 +152,7 @@ export function CameraController() {
       }
     } else {
       orbitStartRef.current = null;
+      orbitStartAzimuthRef.current = null;
       orbitDoneRef.current = false;
       controls?.update();
     }

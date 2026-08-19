@@ -3,10 +3,6 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 const IGNITE_END = 1.8;      // energy pulse reaches the last stone
-const SHOCK_START = 1.8;     // shockwave + particle burst
-const SHOCK_DURATION = 0.9;
-const PARTICLE_LIFE = 1.6;
-const PARTICLE_COUNT = 60;
 
 interface VictoryCelebrationProps {
   positions: [number, number, number][];
@@ -20,12 +16,6 @@ export function VictoryCelebration({ positions, player }: VictoryCelebrationProp
   const startRef = useRef<number | null>(null);
   const stonesRef = useRef<(THREE.Mesh | null)[]>([]);
   const pulseRef = useRef<THREE.Mesh | null>(null);
-  const shockRef = useRef<THREE.Mesh | null>(null);
-  const pointsRef = useRef<THREE.Points | null>(null);
-  const velocitiesRef = useRef<THREE.Vector3[]>([]);
-
-  const last = positions[positions.length - 1];
-  const lastVec = useMemo(() => new THREE.Vector3(...last), [last]);
 
   const line = useMemo(() => {
     const pts = positions.map((p) => new THREE.Vector3(...p));
@@ -33,36 +23,6 @@ export function VictoryCelebration({ positions, player }: VictoryCelebrationProp
     const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.35, depthTest: false, depthWrite: false });
     return new THREE.Line(geo, mat);
   }, [positions, color]);
-
-  const points = useMemo(() => {
-    const pos = new Float32Array(PARTICLE_COUNT * 3);
-    const vel: THREE.Vector3[] = [];
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      pos[i * 3] = lastVec.x;
-      pos[i * 3 + 1] = lastVec.y;
-      pos[i * 3 + 2] = lastVec.z;
-      const dir = new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1);
-      if (dir.lengthSq() < 0.001) dir.set(0, 1, 0);
-      dir.normalize();
-      vel.push(dir.multiplyScalar(0.6 + Math.random() * 1.3));
-    }
-    velocitiesRef.current = vel;
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const mat = new THREE.PointsMaterial({
-      color: glow,
-      size: 0.09,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      depthTest: false,
-      blending: THREE.AdditiveBlending,
-      sizeAttenuation: true,
-    });
-    const pts = new THREE.Points(geo, mat);
-    pts.visible = false;
-    return pts;
-  }, [glow, lastVec]);
 
   useFrame((state) => {
     if (startRef.current === null) startRef.current = state.clock.elapsedTime;
@@ -99,44 +59,6 @@ export function VictoryCelebration({ positions, player }: VictoryCelebrationProp
         mat.emissiveIntensity = 1.7;
       }
     });
-
-    // shockwave shell
-    if (shockRef.current) {
-      const st = t - SHOCK_START;
-      if (st >= 0 && st <= SHOCK_DURATION) {
-        shockRef.current.visible = true;
-        const p = st / SHOCK_DURATION;
-        shockRef.current.scale.setScalar(0.3 + p * 2.2);
-        (shockRef.current.material as THREE.MeshBasicMaterial).opacity = 0.5 * (1 - p);
-      } else {
-        shockRef.current.visible = false;
-      }
-    }
-
-    // particle burst
-    if (pointsRef.current) {
-      const st = t - SHOCK_START;
-      const attr = pointsRef.current.geometry.getAttribute('position') as THREE.BufferAttribute;
-      const arr = attr.array as Float32Array;
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        const v = velocitiesRef.current[i];
-        if (st <= 0) {
-          arr[i * 3] = lastVec.x;
-          arr[i * 3 + 1] = lastVec.y;
-          arr[i * 3 + 2] = lastVec.z;
-        } else {
-          const life = Math.min(1, st / PARTICLE_LIFE);
-          const damp = 1 - life;
-          arr[i * 3] = lastVec.x + v.x * st * damp;
-          arr[i * 3 + 1] = lastVec.y + v.y * st * damp;
-          arr[i * 3 + 2] = lastVec.z + v.z * st * damp;
-        }
-      }
-      attr.needsUpdate = true;
-      const pmat = pointsRef.current.material as THREE.PointsMaterial;
-      pmat.opacity = st <= 0 ? 0 : 0.9 * Math.max(0, 1 - st / PARTICLE_LIFE);
-      pointsRef.current.visible = st > 0;
-    }
   });
 
   return (
@@ -170,15 +92,6 @@ export function VictoryCelebration({ positions, player }: VictoryCelebrationProp
         <sphereGeometry args={[0.22, 16, 16]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.95} depthTest={false} depthWrite={false} />
       </mesh>
-
-      {/* shockwave shell */}
-      <mesh ref={shockRef} visible={false} position={last} raycast={() => null}>
-        <sphereGeometry args={[0.6, 24, 24]} />
-        <meshBasicMaterial color={glow} transparent opacity={0.5} side={THREE.BackSide} depthTest={false} depthWrite={false} />
-      </mesh>
-
-      {/* particle burst */}
-      <primitive object={points} ref={pointsRef} />
     </group>
   );
 }
