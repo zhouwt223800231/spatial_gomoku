@@ -15,16 +15,16 @@ export function useAudio() {
     }).toDestination();
     synthRef.current.volume.value = -10;
 
-    // FM bell / music-box timbre for the victory chime sequence.
+    // Soft glass bell: gentle FM, long decay so each chime rings out naturally.
     chimeSynthRef.current = new Tone.PolySynth(Tone.FMSynth, {
-      harmonicity: 3.01,
-      modulationIndex: 14,
+      harmonicity: 2.5,
+      modulationIndex: 4,
       oscillator: { type: 'sine' },
       modulation: { type: 'sine' },
-      envelope: { attack: 0.001, decay: 1.2, sustain: 0, release: 1.2 },
-      modulationEnvelope: { attack: 0.001, decay: 0.9, sustain: 0, release: 0.9 },
+      envelope: { attack: 0.001, decay: 3.0, sustain: 0, release: 3.0 },
+      modulationEnvelope: { attack: 0.001, decay: 2.5, sustain: 0, release: 2.5 },
     }).toDestination();
-    chimeSynthRef.current.volume.value = -12;
+    chimeSynthRef.current.volume.value = -14;
     initialized.current = true;
   }, []);
 
@@ -42,6 +42,7 @@ export function useAudio() {
 
   // Pentatonic chimes (C5 D5 E5 G5 A5) aligned with the per-stone ignition
   // (0.45s apart, last stone at 1.8s), then a final C-major chord.
+  // Each note's duration covers decay + release so the tail rings out naturally.
   const playVictoryChime = useCallback(() => {
     if (!chimeSynthRef.current) return;
     const synth = chimeSynthRef.current;
@@ -49,25 +50,27 @@ export function useAudio() {
     const step = IGNITE_END / 4;
     const scale = ['C5', 'D5', 'E5', 'G5', 'A5'];
     const chord = ['C5', 'E5', 'G5', 'C6'];
+    const NOTE_RING = 4.5;
+    const CHORD_RING = 5.0;
 
     Tone.Transport.cancel(0);
     scale.forEach((note, i) => {
       Tone.Transport.schedule((time) => {
-        synth.triggerAttackRelease(note, 1.1, time);
+        synth.triggerAttackRelease(note, NOTE_RING, time);
       }, i * step);
     });
     Tone.Transport.schedule((time) => {
-      chord.forEach((n) => synth.triggerAttackRelease(n, 1.4, time));
+      chord.forEach((n) => synth.triggerAttackRelease(n, CHORD_RING, time));
     }, IGNITE_END + 0.1);
 
     Tone.Transport.stop();
     Tone.Transport.position = 0;
     Tone.Transport.start();
-    // Stop the transport after the chord tail has rung out.
+    // Reset the transport only after the chord tail has fully rung out.
     window.setTimeout(() => {
       Tone.Transport.stop();
       Tone.Transport.cancel(0);
-    }, 3600);
+    }, 6600);
   }, []);
 
   const cancelVictoryChime = useCallback(() => {

@@ -34,7 +34,7 @@
   100% { opacity: 1; transform: scale(1); filter: blur(0); }
 }
 .victory-title {
-  animation: victory-title 0.9s ease 4.4s both;
+  animation: victory-title 0.9s ease 4.6s both;
   text-shadow: 0 0 18px rgba(251, 191, 36, 0.55), 0 0 44px rgba(251, 191, 36, 0.28);
 }
 .victory-title--blue {
@@ -46,7 +46,7 @@
   100% { opacity: 1; }
 }
 .victory-subtitle {
-  animation: victory-subtitle 0.8s ease 5.0s both;
+  animation: victory-subtitle 0.8s ease 5.2s both;
 }
 
 @keyframes victory-btn {
@@ -54,7 +54,7 @@
   100% { opacity: 1; transform: translateY(0); }
 }
 .victory-btn {
-  animation: victory-btn 0.6s ease 5.6s both;
+  animation: victory-btn 0.6s ease 5.8s both;
 }
 
 .victory-vignette {

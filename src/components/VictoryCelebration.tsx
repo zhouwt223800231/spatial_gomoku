@@ -16,6 +16,7 @@ export function VictoryCelebration({ positions, player }: VictoryCelebrationProp
   const startRef = useRef<number | null>(null);
   const stonesRef = useRef<(THREE.Mesh | null)[]>([]);
   const pulseRef = useRef<THREE.Mesh | null>(null);
+  const lineGeoRef = useRef<THREE.BufferGeometry | null>(null);
 
   const line = useMemo(() => {
     const pts = positions.map((p) => new THREE.Vector3(...p));
@@ -24,15 +25,24 @@ export function VictoryCelebration({ positions, player }: VictoryCelebrationProp
     return new THREE.Line(geo, mat);
   }, [positions, color]);
 
+  const segCount = positions.length - 1;
+
   useFrame((state) => {
     if (startRef.current === null) startRef.current = state.clock.elapsedTime;
     const t = state.clock.elapsedTime - startRef.current;
     const progress = Math.min(1, t / IGNITE_END);
 
-    // energy pulse travels along the line
+    // Line grows progressively from the first stone to the last.
+    if (lineGeoRef.current) {
+      const drawCount = Math.round(progress * segCount) + 1;
+      lineGeoRef.current.setDrawRange(0, drawCount);
+      lineGeoRef.current.attributes.position.needsUpdate = true;
+    }
+
+    // energy pulse travels along the line, synced to the growing tip
     if (pulseRef.current) {
-      const idxF = progress * (positions.length - 1);
-      const i = Math.min(positions.length - 2, Math.floor(idxF));
+      const idxF = progress * segCount;
+      const i = Math.min(segCount - 1, Math.floor(idxF));
       const f = idxF - i;
       const a = new THREE.Vector3(...positions[i]);
       const b = new THREE.Vector3(...positions[i + 1]);
@@ -44,7 +54,7 @@ export function VictoryCelebration({ positions, player }: VictoryCelebrationProp
     // stones ignite sequentially
     stonesRef.current.forEach((mesh, i) => {
       if (!mesh) return;
-      const igniteAt = i / (positions.length - 1);
+      const igniteAt = i / segCount;
       const local = (progress - igniteAt) / 0.22;
       const mat = mesh.material as THREE.MeshStandardMaterial;
       if (local <= 0) {
@@ -63,7 +73,7 @@ export function VictoryCelebration({ positions, player }: VictoryCelebrationProp
 
   return (
     <group>
-      <primitive object={line} />
+      <primitive object={line} ref={(obj: THREE.Line | null) => { lineGeoRef.current = obj?.geometry ?? null; }} />
 
       {positions.map((p, i) => (
         <mesh

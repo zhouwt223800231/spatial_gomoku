@@ -4,10 +4,14 @@ import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import { useGameStore } from '../store/gameStore';
 
-const ORBIT_DURATION = 3.0;
+const IGNITE_END = 1.8;      // phase 1: line grows / stones ignite (camera holds)
+const APPROACH_END = 3.0;    // phase 2: camera eases to the fixed 45° pose
+const ORBIT_DURATION = 3.0;  // phase 3: 360° orbit (ends at APPROACH_END + ORBIT_DURATION)
 const ORBIT_ANGLE = Math.PI / 4; // fixed 45° inclination to the winning line
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+const easeInOutCubic = (t: number) =>
+  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
 export function CameraController() {
   const camera = useThree((s) => s.camera);
@@ -17,8 +21,8 @@ export function CameraController() {
   const resetViewTick = useGameStore((s) => s.resetViewTick);
   const winLine = useGameStore((s) => s.winLine);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
-  const orbitStartRef = useRef<number | null>(null);
-  const orbitStartAzimuthRef = useRef<number | null>(null);
+  const phaseStartRef = useRef<number | null>(null);
+  const approachStartPosRef = useRef<THREE.Vector3 | null>(null);
   const orbitDoneRef = useRef(false);
 
   // Fit the whole board into view whenever size / view / overview changes.
@@ -78,25 +82,25 @@ export function CameraController() {
     };
   }, [camera, gl, gamePhase, boardSize]);
 
-  // Reset the orbit state whenever we leave the won state.
+  // Reset the phase state whenever we leave the won state.
   useEffect(() => {
     if (gamePhase !== 'won') {
-      orbitStartRef.current = null;
-      orbitStartAzimuthRef.current = null;
+      phaseStartRef.current = null;
+      approachStartPosRef.current = null;
       orbitDoneRef.current = false;
     }
   }, [gamePhase]);
 
   useFrame((state) => {
     const controls = controlsRef.current;
-    const orbiting = gamePhase === 'won' && !!winLine && winLine.positions.length >= 2;
+    const celebrating = gamePhase === 'won' && !!winLine && winLine.positions.length >= 2;
 
-    if (orbiting) {
-      if (orbitStartRef.current === null) {
-        orbitStartRef.current = state.clock.elapsedTime;
-        orbitStartAzimuthRef.current = null;
+    if (celebrating) {
+      if (phaseStartRef.current === null) {
+        phaseStartRef.current = state.clock.elapsedTime;
+        approachStartPosRef.current = null;
       }
-      const t = state.clock.elapsedTime - orbitStartRef.current;
+      const t = state.clock.elapsedTime - phaseStartRef.current;
       const offset = (boardSize - 1) / 2;
       const a = new THREE.Vector3(
         winLine.positions[0].x - offset,
@@ -115,28 +119,27 @@ export function CameraController() {
       h.normalize();
       const v = new THREE.Vector3().crossVectors(dir, h).normalize();
 
-      // Orbit basis: radial keeps a fixed 45° inclination to the line,
-      // tangent rotates around the line direction.
+      // Orbit basis shared by the approach and orbit phases (zero-jump handoff).
       const radial = h.clone().multiplyScalar(Math.cos(ORBIT_ANGLE))
         .add(v.clone().multiplyScalar(Math.sin(ORBIT_ANGLE)));
       const tangent = new THREE.Vector3().crossVectors(dir, radial).normalize();
-
-      // Pick the orbit start azimuth so the camera keeps its current position
-      // (no jump when the orbit begins).
-      if (orbitStartAzimuthRef.current === null) {
-        const camOff = camera.position.clone().sub(mid);
-        const projH = camOff.dot(h);
-        const projV = camOff.dot(v);
-        const projLen = Math.hypot(projH, projV);
-        orbitStartAzimuthRef.current = projLen > 1e-4 ? Math.atan2(projV, projH) : 0;
-      }
-
       const radius = lineLen * 0.6 + 3;
+      const orbitStart = mid.clone().add(radial.clone().multiplyScalar(radius));
 
-      if (!orbitDoneRef.current && t <= ORBIT_DURATION) {
-        if (controls) controls.enabled = false;
-        const p = easeInOut(Math.min(1, t / ORBIT_DURATION));
-        const angle = orbitStartAzimuthRef.current + p * Math.PI * 2;
+      if (controls) controls.enabled = false;
+
+      if (t < APPROACH_END) {
+        // Phase 1 (hold, watch the line grow) + Phase 2 (ease to the 45° pose).
+        if (approachStartPosRef.current === null) {
+          approachStartPosRef.current = camera.position.clone();
+        }
+        const p = easeInOutCubic(Math.max(0, Math.min(1, (t - IGNITE_END) / (APPROACH_END - IGNITE_END))));
+        camera.position.lerpVectors(approachStartPosRef.current, orbitStart, p);
+        camera.lookAt(mid);
+      } else if (!orbitDoneRef.current && t <= APPROACH_END + ORBIT_DURATION) {
+        // Phase 3: 360° orbit from the 45° pose.
+        const p = easeInOut(Math.min(1, (t - APPROACH_END) / ORBIT_DURATION));
+        const angle = p * Math.PI * 2;
         const pos = mid.clone()
           .add(radial.clone().multiplyScalar(Math.cos(angle) * radius))
           .add(tangent.clone().multiplyScalar(Math.sin(angle) * radius));
@@ -151,8 +154,8 @@ export function CameraController() {
         }
       }
     } else {
-      orbitStartRef.current = null;
-      orbitStartAzimuthRef.current = null;
+      phaseStartRef.current = null;
+      approachStartPosRef.current = null;
       orbitDoneRef.current = false;
       controls?.update();
     }
