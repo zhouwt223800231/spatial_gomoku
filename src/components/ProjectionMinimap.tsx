@@ -117,7 +117,7 @@ export function ProjectionMinimap() {
   const ghost = useGameStore((s) => s.ghostPosition);
 
   return (
-    <div className="hidden md:block col-start-1 row-start-2 self-end pointer-events-auto">
+    <div>
       <div className="glass-panel p-4">
         <h3 className="panel-label text-center mb-3">Projections</h3>
         <div className="flex gap-2.5">

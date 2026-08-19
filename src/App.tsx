@@ -16,7 +16,8 @@ import { WebGLDiagnostic } from './components/WebGLDiagnostic';
 import { Starfield } from './components/Starfield';
 import { LiveLines } from './components/LiveLines';
 import { Menu } from './components/UI/Menu';
-import { GameHUD } from './components/UI/GameHUD';
+import { PlayerPanel, StatusBar, ControlsPanel, BottomBar, ConfirmBar } from './components/UI/panels';
+import { MobilePreviewPad } from './components/UI/MobilePreviewPad';
 import { AIInsight } from './components/UI/AIInsight';
 import { StrategyRadar } from './components/UI/StrategyRadar';
 import { ProjectionMinimap } from './components/ProjectionMinimap';
@@ -105,6 +106,26 @@ export default function App() {
     fineModeRef.current = true;
   }, []);
 
+  // Shared preview-move logic used by keyboard (desktop) and D-pad (mobile).
+  const moveGhost = useCallback((axis: 'x' | 'y' | 'z', delta: number) => {
+    const st = useGameStore.getState();
+    if (st.gamePhase !== 'playing') return;
+    const size = st.boardSize;
+    const clamp = (v: number) => Math.max(0, Math.min(size - 1, v));
+    const cur = st.ghostPosition;
+    if (!cur) {
+      if (axis === 'z') st.setActiveLayer(clamp(st.activeLayer + delta));
+      return;
+    }
+    const pos = { ...cur };
+    if (axis === 'x') pos.x = clamp(cur.x + delta);
+    else if (axis === 'y') pos.y = clamp(cur.y + delta);
+    else pos.z = clamp(cur.z + delta);
+    st.setGhostPosition(pos);
+    st.setSliceAxis(axis);
+    if (axis === 'z') st.setActiveLayer(pos.z);
+  }, []);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const st = useGameStore.getState();
@@ -119,20 +140,7 @@ export default function App() {
       if (key === '0' || key === 'f' || key === 'r') { e.preventDefault(); st.requestOverview(); return; }
       if (key === 'o') { e.preventDefault(); st.setViewMode(st.viewMode === 'orthographic' ? 'perspective' : 'orthographic'); return; }
 
-      const move = (axis: 'x' | 'y' | 'z', delta: number) => {
-        const cur = st.ghostPosition;
-        if (!cur) {
-          if (axis === 'z') st.setActiveLayer(clamp(st.activeLayer + delta));
-          return;
-        }
-        const pos = { ...cur };
-        if (axis === 'x') pos.x = clamp(cur.x + delta);
-        else if (axis === 'y') pos.y = clamp(cur.y + delta);
-        else pos.z = clamp(cur.z + delta);
-        st.setGhostPosition(pos);
-        st.setSliceAxis(axis);
-        if (axis === 'z') st.setActiveLayer(pos.z);
-      };
+      const move = moveGhost;
 
       if (KEYMAP.xNeg.includes(key)) { move('x', -1); e.preventDefault(); }
       else if (KEYMAP.xPos.includes(key)) { move('x', 1); e.preventDefault(); }
@@ -145,7 +153,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [confirmPlace, cancelPreview]);
+  }, [confirmPlace, cancelPreview, moveGhost]);
 
   useEffect(() => {
     const onFirstGesture = () => {
@@ -300,12 +308,29 @@ export default function App() {
       {gamePhase === 'menu' && <Menu />}
 
       {gamePhase === 'playing' && (
-        <div className="absolute inset-0 z-10 grid grid-cols-1 md:grid-cols-[auto_1fr_auto] grid-rows-[auto_auto_1fr_auto] md:grid-rows-[auto_1fr_auto] gap-3 p-3 md:p-4 pointer-events-none overflow-hidden">
-          <GameHUD onConfirm={confirmPlace} onCancel={cancelPreview} onToggleDrawer={() => setDrawerOpen(!drawerOpen)} />
-          <StrategyRadar />
-          <ProjectionMinimap />
-          {gameMode === 'ai' && <AIInsight />}
-        </div>
+        <>
+          {/* Mobile: single flex column - status bar, board, bottom bar (+ preview pad) */}
+          <div className="absolute inset-0 z-10 flex md:hidden flex-col pointer-events-none p-3">
+            <div className="pointer-events-auto"><StatusBar /></div>
+            <div className="flex-1" />
+            <div className="pointer-events-auto flex flex-col items-center gap-2">
+              <MobilePreviewPad onMove={moveGhost} onConfirm={confirmPlace} onCancel={cancelPreview} />
+              <BottomBar onToggleDrawer={() => setDrawerOpen(true)} />
+            </div>
+          </div>
+
+          {/* Desktop: three-column grid */}
+          <div className="absolute inset-0 z-10 hidden md:grid grid-cols-[auto_1fr_auto] grid-rows-[auto_1fr_auto] gap-3 p-4 pointer-events-none overflow-hidden">
+            <div className="col-start-1 row-start-1 pointer-events-auto"><PlayerPanel /></div>
+            <div className="col-start-2 row-start-1 self-start justify-self-center pointer-events-auto"><StatusBar /></div>
+            <div className="col-start-3 row-start-1 justify-self-end pointer-events-auto"><ControlsPanel /></div>
+            <div className="col-start-1 row-start-2 self-start pointer-events-auto"><StrategyRadar /></div>
+            <div className="col-start-1 row-start-2 self-end pointer-events-auto"><ProjectionMinimap /></div>
+            {gameMode === 'ai' && <div className="col-start-3 row-start-2 self-end pointer-events-auto w-64"><AIInsight /></div>}
+            <div className="col-start-2 row-start-3 self-end justify-self-center pointer-events-auto"><BottomBar /></div>
+            <ConfirmBar onConfirm={confirmPlace} onCancel={cancelPreview} />
+          </div>
+        </>
       )}
 
       <InfoDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
