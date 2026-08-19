@@ -5,9 +5,9 @@ import * as THREE from 'three';
 import { useGameStore } from '../store/gameStore';
 
 const IGNITE_END = 1.8;      // phase 1: line grows / stones ignite (camera holds)
-const APPROACH_END = 3.0;    // phase 2: camera eases to the fixed 45掳 pose
-const ORBIT_DURATION = 3.0;  // phase 3: 360掳 orbit (ends at APPROACH_END + ORBIT_DURATION)
-const ORBIT_ANGLE = Math.PI / 4; // fixed 45掳 inclination to the winning line
+const APPROACH_END = 3.0;    // phase 2: camera eases to the fixed 45鎺?pose
+const ORBIT_DURATION = 3.0;  // phase 3: 360鎺?orbit (ends at APPROACH_END + ORBIT_DURATION)
+const ORBIT_ANGLE = Math.PI / 4; // fixed 45鎺?inclination to the winning line
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 const easeInOutCubic = (t: number) =>
@@ -67,7 +67,8 @@ export function CameraController() {
 
   useEffect(() => {
     const controls = new OrbitControlsImpl(camera, gl.domElement);
-    controls.enablePan = false;
+    controls.enablePan = true;
+    controls.panSpeed = 0.8;
     controls.enableZoom = true;
     controls.enableRotate = true;
     controls.mouseButtons = {
@@ -77,7 +78,7 @@ export function CameraController() {
     };
     controls.touches = {
       ONE: THREE.TOUCH.ROTATE,
-      TWO: THREE.TOUCH.DOLLY_ROTATE,
+      TWO: THREE.TOUCH.DOLLY_PAN,
     };
     controls.minDistance = 3;
     controls.maxDistance = boardSize * 3;
@@ -139,7 +140,7 @@ export function CameraController() {
       if (controls) controls.enabled = false;
 
       if (t < APPROACH_END) {
-        // Phase 1 (hold, watch the line grow) + Phase 2 (ease to the 45掳 pose).
+        // Phase 1 (hold, watch the line grow) + Phase 2 (ease to the 45鎺?pose).
         if (approachStartPosRef.current === null) {
           approachStartPosRef.current = camera.position.clone();
         }
@@ -147,7 +148,7 @@ export function CameraController() {
         camera.position.lerpVectors(approachStartPosRef.current, orbitStart, p);
         camera.lookAt(mid);
       } else if (!orbitDoneRef.current && t <= APPROACH_END + ORBIT_DURATION) {
-        // Phase 3: 360掳 orbit from the 45掳 pose.
+        // Phase 3: 360鎺?orbit from the 45鎺?pose.
         const p = easeInOut(Math.min(1, (t - APPROACH_END) / ORBIT_DURATION));
         const angle = p * Math.PI * 2;
         const pos = mid.clone()
