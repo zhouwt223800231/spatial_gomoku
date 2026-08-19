@@ -36,7 +36,7 @@ export function StrategyRadar() {
   }, [stones, boardSize, currentPlayer]);
 
   return (
-    <div className="absolute top-24 left-6 z-10">
+    <div className="absolute top-44 left-6 z-10">
       <div className="glass-panel p-4 w-36">
         <h3 className="text-white/60 text-xs uppercase tracking-wider mb-3">Strategy Radar</h3>
         <div className="space-y-3">
