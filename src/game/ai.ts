@@ -1,25 +1,92 @@
 import { Position, Player, StoneData, BoardSize } from '../types';
 import { getCandidatePositions } from './rules';
 import { evaluatePosition, EvalWeights, DEFAULT_WEIGHTS } from './evaluate';
-import { checkWin } from './rules';
+import { checkWin, DIRECTIONS } from './rules';
 
-/**
- * Minimax + Alpha-Beta。
- *
- * v2 性能保护：
- * - 候选点按启发式排序（先看离已有棋子近、且有相邻子威胁的位置），配合 alpha-beta 剪枝可大幅减枝。
- * - 每层候选数按棋盘大小动态限制，避免 7×7×7 / 9×9×9 指数爆炸。
- * - 增加绝对深度上限，防止自适应权重把 maxDepth 抬到不可用。
- */
-
-// 总节点预算上限（防止任意棋盘/深度组合卡死）
+// Total node budget (prevents any board/depth combo from freezing).
 const MAX_NODES = 200_000;
 
-// 每层候选上限：棋盘越大，搜索宽度越需收紧
+export interface MoveResult {
+  position: Position;
+  blocked: boolean;
+}
+
+// Per-layer candidate cap: larger boards need tighter breadth.
 function candidateLimit(boardSize: BoardSize): number {
   if (boardSize <= 5) return 16;
   if (boardSize === 7) return 12;
   return 8;
+}
+
+const keyOf = (p: Position) => `${p.x},${p.y},${p.z}`;
+
+/**
+ * Detect every opponent run of exactly length 3 along the 13 winning
+ * directions that has at least one open (empty, in-bounds) end.
+ * Returns the set of open-end cells that would block such a three.
+ */
+export function findBlockingMoves(
+  stones: StoneData[],
+  opponent: Player,
+  boardSize: BoardSize
+): Map<string, { count: number }> {
+  const stoneMap = new Map<string, Player>();
+  stones.forEach((s) => stoneMap.set(keyOf(s.position), s.player));
+
+  const blockers = new Map<string, { count: number }>();
+  const bump = (p: Position) => {
+    const k = keyOf(p);
+    const cur = blockers.get(k);
+    if (cur) cur.count += 1;
+    else blockers.set(k, { count: 1 });
+  };
+
+  const isOpen = (p: Position) =>
+    p.x >= 0 && p.x < boardSize && p.y >= 0 && p.y < boardSize && p.z >= 0 && p.z < boardSize &&
+    !stoneMap.has(keyOf(p));
+
+  for (const stone of stones) {
+    if (stone.player !== opponent) continue;
+    for (const dir of DIRECTIONS) {
+      // Walk backwards to the start of this contiguous opponent run.
+      const behind: Position = {
+        x: stone.position.x - dir.x,
+        y: stone.position.y - dir.y,
+        z: stone.position.z - dir.z,
+      };
+      if (behind.x >= 0 && behind.x < boardSize && behind.y >= 0 && behind.y < boardSize && behind.z >= 0 && behind.z < boardSize &&
+          stoneMap.get(keyOf(behind)) === opponent) continue;
+
+      const run: Position[] = [stone.position];
+      for (let i = 1; i < 5; i++) {
+        const p = {
+          x: stone.position.x + dir.x * i,
+          y: stone.position.y + dir.y * i,
+          z: stone.position.z + dir.z * i,
+        };
+        if (p.x < 0 || p.x >= boardSize || p.y < 0 || p.y >= boardSize || p.z < 0 || p.z >= boardSize) break;
+        if (stoneMap.get(keyOf(p)) !== opponent) break;
+        run.push(p);
+      }
+
+      if (run.length !== 3) continue;
+
+      const end1 = {
+        x: run[run.length - 1].x + dir.x,
+        y: run[run.length - 1].y + dir.y,
+        z: run[run.length - 1].z + dir.z,
+      };
+      const end2 = {
+        x: run[0].x - dir.x,
+        y: run[0].y - dir.y,
+        z: run[0].z - dir.z,
+      };
+      if (isOpen(end1)) bump(end1);
+      if (isOpen(end2)) bump(end2);
+    }
+  }
+
+  return blockers;
 }
 
 export function findBestMove(
@@ -27,28 +94,56 @@ export function findBestMove(
   aiPlayer: Player,
   boardSize: BoardSize,
   weights: EvalWeights = DEFAULT_WEIGHTS,
-  maxDepth: number = 3
-): Position {
+  maxDepth: number = 3,
+  blockWeight: number = 1.0
+): MoveResult {
   const candidates = getCandidatePositions(stones, boardSize);
-  if (candidates.length === 0) return { x: 0, y: 0, z: 0 };
+  if (candidates.length === 0) return { position: { x: 0, y: 0, z: 0 }, blocked: false };
 
-  // AI 如果已有胜着，直接选最优先
+  // 1) AI wins immediately -> take it.
   for (const move of candidates) {
     const test = [...stones, { position: move, player: aiPlayer }];
-    if (checkWin(test, boardSize)) return move;
+    if (checkWin(test, boardSize)) return { position: move, blocked: false };
   }
 
-  // 防守：如果对手下一步能赢，优先封堵
   const opponent: Player = aiPlayer === 'black' ? 'white' : 'black';
+
+  // 2) Opponent would win next move -> block it.
   for (const move of candidates) {
     const test = [...stones, { position: move, player: opponent }];
-    if (checkWin(test, boardSize)) return move;
+    if (checkWin(test, boardSize)) return { position: move, blocked: true };
   }
 
-  const depth = Math.min(maxDepth, 3); // 绝对上限保护：任何情况下不超过 3 层
-  const limit = candidateLimit(boardSize);
+  // 3) Opponent has an open/closed three -> block its open end(s).
+  if (blockWeight > 0) {
+    const blockers = findBlockingMoves(stones, opponent, boardSize);
+    if (blockers.size > 0) {
+      let best: Position | null = null;
+      let bestScore = -Infinity;
+      for (const [k, info] of blockers) {
+        const [x, y, z] = k.split(',').map(Number);
+        const move = { x, y, z };
+        const s = info.count * 1000 + orderScore(move, stones, aiPlayer, boardSize);
+        if (s > bestScore) {
+          bestScore = s;
+          best = move;
+        }
+      }
+      if (best) return { position: best, blocked: true };
+    }
+  }
 
-  // 按启发式评分排序，让更可能的落点在剪枝时更早被评估
+  const depth = Math.min(maxDepth, 3);
+  const limit = candidateLimit(boardSize);
+  if (maxDepth <= 2) {
+    // Easy: keep the search shallow and narrow for quick, forgiving play.
+    const narrowed = candidates.slice(0, Math.max(4, Math.floor(limit / 2)));
+    const scored = narrowed
+      .map(move => ({ move, s: orderScore(move, stones, aiPlayer, boardSize) }))
+      .sort((a, b) => b.s - a.s);
+    return { position: scored[0].move, blocked: false };
+  }
+
   let ordered = candidates;
   if (stones.length > 1) {
     ordered = candidates
@@ -78,10 +173,10 @@ export function findBestMove(
     if (nodes >= MAX_NODES) break;
   }
 
-  return bestMove;
+  return { position: bestMove, blocked: false };
 }
 
-// 启发式排序分：距离最近己方/对方棋子越近越优先，且偏好的进攻/防守方向偏高
+// Heuristic ordering: favor center, proximity to stones, and blocking a three.
 function orderScore(
   move: Position,
   stones: StoneData[],
@@ -91,11 +186,10 @@ function orderScore(
   let score = 0;
   const center = (boardSize - 1) / 2;
   const distCenter = Math.abs(move.x - center) + Math.abs(move.y - center) + Math.abs(move.z - center);
-  score += (3 * center - distCenter) * 0.5; // 偏中心
-
+  score += (3 * center - distCenter) * 0.5;
   for (const s of stones) {
     const d = Math.abs(s.position.x - move.x) + Math.abs(s.position.y - move.y) + Math.abs(s.position.z - move.z);
-    if (d === 1) score += s.player === aiPlayer ? 8 : 10; // 贴邻：对方威胁更大优先防
+    if (d === 1) score += s.player === aiPlayer ? 8 : 10;
     else if (d === 2) score += s.player === aiPlayer ? 4 : 5;
     else if (d <= 3) score += 1;
   }
@@ -123,23 +217,12 @@ function minimax(
   let candidates = getCandidatePositions(stones, boardSize);
   if (candidates.length === 0) return score;
 
-  // 同层也做启发式排序，加速剪枝
   if (isMaximizing) {
     candidates = candidates
       .map(move => ({ move, s: orderScore(move, stones, currentPlayer, boardSize) }))
       .sort((a, b) => b.s - a.s)
       .slice(0, limit)
       .map(x => x.move);
-  } else {
-    // 极小层优先看防守价值高的点（等效：让对手威胁被尽早评估）
-    candidates = candidates
-      .map(move => ({ move, s: -orderScore(move, stones, currentPlayer, boardSize) }))
-      .sort((a, b) => a.s - b.s)
-      .slice(0, limit)
-      .map(x => x.move);
-  }
-
-  if (isMaximizing) {
     let maxEval = -Infinity;
     for (const move of candidates) {
       const newStones = [...stones, { position: move, player: currentPlayer }];
@@ -150,6 +233,11 @@ function minimax(
     }
     return maxEval;
   } else {
+    candidates = candidates
+      .map(move => ({ move, s: -orderScore(move, stones, currentPlayer, boardSize) }))
+      .sort((a, b) => b.s - a.s)
+      .slice(0, limit)
+      .map(x => x.move);
     let minEval = Infinity;
     for (const move of candidates) {
       const newStones = [...stones, { position: move, player: currentPlayer }];

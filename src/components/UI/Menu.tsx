@@ -3,7 +3,7 @@ import { useGameStore } from '../../store/gameStore';
 import { BoardSize, Player } from '../../types';
 
 export function Menu() {
-  const { setGameMode, startGame, setBoardSize, setHumanPlayer, boardSize, humanPlayer } = useGameStore();
+  const { setGameMode, startGame, setBoardSize, setHumanPlayer, setAiDifficulty, boardSize, humanPlayer, aiDifficulty } = useGameStore();
 
   const colorChoice = (c: Player) =>
     `flex-1 py-2.5 rounded-xl border font-mono text-sm transition-all ${
@@ -11,6 +11,8 @@ export function Menu() {
         ? 'bg-cyan-400/15 border-cyan-200/50 text-cyan-100 shadow-glow-sm'
         : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/75'
     }`;
+
+  const difficultyLabel: Record<string, string> = { easy: '简单', normal: '普通', hard: '困难' };
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-[#070b16]/55 backdrop-blur-sm overflow-y-auto py-8 px-4">
@@ -48,6 +50,25 @@ export function Menu() {
             <div className="flex gap-2">
               <button onClick={() => setHumanPlayer('black')} className={colorChoice('black')}>我执黑 · 先手</button>
               <button onClick={() => setHumanPlayer('white')} className={colorChoice('white')}>我执白 · 后手</button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="panel-label">AI 难度 · Difficulty</label>
+            <div className="flex gap-2">
+              {(['easy', 'normal', 'hard'] as const).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setAiDifficulty(d)}
+                  className={`flex-1 py-2 rounded-lg border text-xs transition-all ${
+                    aiDifficulty === d
+                      ? 'bg-cyan-400/15 border-cyan-200/50 text-cyan-100 shadow-glow-sm'
+                      : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/75'
+                  }`}
+                >
+                  {difficultyLabel[d]}
+                </button>
+              ))}
             </div>
           </div>
 

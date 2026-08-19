@@ -3,8 +3,9 @@ import { Canvas } from '@react-three/fiber';
 import { useGameStore } from './store/gameStore';
 import { Position, Player } from './types';
 import { checkWin, isDraw } from './game/rules';
-import { findBestMove } from './game/ai';
+import { findBestMove, findBlockingMoves } from './game/ai';
 import { getAdaptiveWeights } from './game/adaptiveAI';
+import { loadAIExperience, updateAIExperience } from './game/aiExperience';
 import { usePlayerProfile } from './hooks/usePlayerProfile';
 import { useAudio } from './hooks/useAudio';
 import { Board3D } from './components/Board3D';
@@ -37,6 +38,7 @@ export default function App() {
     boardSize,
     gameMode,
     humanPlayer,
+    aiDifficulty,
     placeStone,
     setGhostPosition,
     setActiveLayer,
@@ -57,6 +59,7 @@ export default function App() {
   const { init, playPlaceSound, playVictoryChime, cancelVictoryChime } = useAudio();
   const aiPlayer: Player = humanPlayer === 'black' ? 'white' : 'black';
   const aiTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const aiBlocksRef = useRef(0);
   const fineModeRef = useRef(false);
 
   const placeAt = useCallback((pos: Position) => {
@@ -171,9 +174,35 @@ export default function App() {
       const st = useGameStore.getState();
       const isPlayerWin = gameMode === 'ai' && win.player === st.humanPlayer;
       recordGame(isPlayerWin, gameMode === 'ai' && win.player === (st.humanPlayer === 'black' ? 'white' : 'black'), movesCount);
+
+      if (gameMode === 'ai') {
+        const ai = st.humanPlayer === 'black' ? 'white' as Player : 'black' as Player;
+        const aiWon = win.player === ai;
+        const aiLost = win.player !== ai;
+        const opp = ai === 'black' ? 'white' as Player : 'black' as Player;
+        const leftoverThreats = findBlockingMoves(stones, opp, boardSize);
+        updateAIExperience(loadAIExperience(), {
+          aiWin: aiWon,
+          aiLost,
+          draw: false,
+          lossByOpenThree: aiLost && leftoverThreats.size > 0,
+          blocks: aiBlocksRef.current,
+        });
+        aiBlocksRef.current = 0;
+      }
     } else if (isDraw(stones, boardSize)) {
       setGamePhase('draw');
       recordGame(false, false, movesCount);
+      if (gameMode === 'ai') {
+        updateAIExperience(loadAIExperience(), {
+          aiWin: false,
+          aiLost: false,
+          draw: true,
+          lossByOpenThree: false,
+          blocks: aiBlocksRef.current,
+        });
+        aiBlocksRef.current = 0;
+      }
     }
   }, [stones, boardSize, gameMode, movesCount, recordGame]);
 
@@ -184,18 +213,19 @@ export default function App() {
 
     setAiThinking(true);
     aiTimeoutRef.current = setTimeout(() => {
-      const { weights, maxDepth, insight } = getAdaptiveWeights(profile, movesCount);
+      const { weights, maxDepth, blockWeight, insight } = getAdaptiveWeights(profile, movesCount, aiDifficulty, loadAIExperience());
       if (insight) {
         addAiInsight({ id: Date.now().toString(), type: 'adapted', message: insight, timestamp: Date.now() });
       }
-      const move = findBestMove(stones, ai, boardSize, weights, maxDepth);
-      placeStone(move);
-      playPlaceSound(move, boardSize);
+      const result = findBestMove(stones, ai, boardSize, weights, maxDepth, blockWeight);
+      aiBlocksRef.current += result.blocked ? 1 : 0;
+      placeStone(result.position);
+      playPlaceSound(result.position, boardSize);
       setAiThinking(false);
     }, 800);
 
     return () => clearTimeout(aiTimeoutRef.current);
-  }, [currentPlayer, gameMode, gamePhase, stones, boardSize, profile, movesCount, humanPlayer, placeStone, playPlaceSound, addAiInsight, setAiThinking]);
+  }, [currentPlayer, gameMode, gamePhase, stones, boardSize, profile, movesCount, humanPlayer, aiDifficulty, placeStone, playPlaceSound, addAiInsight, setAiThinking]);
 
   useEffect(() => {
     if (gamePhase === 'playing') {

@@ -15,6 +15,7 @@ export interface EvalWeights {
   FOUR: number;
   OPEN_THREE: number;
   THREE: number;
+  BLOCK_THREE: number;
   OPEN_TWO: number;
   TWO: number;
   CENTER: number;
@@ -31,6 +32,7 @@ export const DEFAULT_WEIGHTS: EvalWeights = {
   FOUR: 5000,
   OPEN_THREE: 1000,
   THREE: 500,
+  BLOCK_THREE: 1.0,
   OPEN_TWO: 100,
   TWO: 50,
   CENTER: 30,

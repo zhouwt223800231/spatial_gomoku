@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Position, Player, StoneData, GameMode, GamePhase, WinLineData, BoardSize, AIInsight, ViewMode } from '../types';
+import { Position, Player, StoneData, GameMode, GamePhase, WinLineData, BoardSize, AIInsight, ViewMode, AiDifficulty } from '../types';
 
 export type SliceAxis = 'x' | 'y' | 'z';
 
@@ -10,6 +10,7 @@ interface GameState {
   gamePhase: GamePhase;
   gameMode: GameMode;
   humanPlayer: Player;
+  aiDifficulty: AiDifficulty;
   winner: Player | null;
   winLine: WinLineData | null;
   ghostPosition: Position | null;
@@ -28,6 +29,7 @@ interface GameState {
   setBoardSize: (size: BoardSize) => void;
   setGameMode: (mode: GameMode) => void;
   setHumanPlayer: (player: Player) => void;
+  setAiDifficulty: (d: AiDifficulty) => void;
   startGame: () => void;
   placeStone: (position: Position) => void;
   setGhostPosition: (pos: Position | null) => void;
@@ -56,6 +58,7 @@ const createInitialState = () => ({
   gamePhase: 'menu' as GamePhase,
   gameMode: 'pvp' as GameMode,
   humanPlayer: 'black' as Player,
+  aiDifficulty: 'normal' as AiDifficulty,
   winner: null as Player | null,
   winLine: null as WinLineData | null,
   ghostPosition: null as Position | null,
@@ -79,6 +82,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   setGameMode: (mode) => set({ gameMode: mode }),
 
   setHumanPlayer: (player) => set({ humanPlayer: player }),
+
+  setAiDifficulty: (d) => set({ aiDifficulty: d }),
 
   startGame: () => set((state) => ({
     ...createInitialState(),
