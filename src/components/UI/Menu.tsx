@@ -17,15 +17,15 @@ export function Menu() {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-[#070b16]/55 backdrop-blur-sm overflow-y-auto py-8 px-4">
       <div className="text-center mb-10">
-        <h1 className="font-display text-5xl md:text-6xl font-light tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-200 via-white to-violet-300 mb-3">
+        <h1 className="font-display font-light tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-200 via-white to-violet-300 mb-3" style={{ fontSize: 'clamp(2rem, 9vw, 3.75rem)' }}>
           Spatial Gomoku
         </h1>
         <p className="text-white/40 text-sm md:text-base tracking-[0.3em] uppercase">3D Spatial Gomoku · 五子棋</p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6">
+      <div className="flex flex-col md:flex-row gap-6 w-full max-w-2xl items-center md:items-start justify-center">
         {/* Game setup */}
-        <div className="glass-panel p-6 w-[21rem] space-y-6">
+        <div className="glass-panel p-6 w-full max-w-sm space-y-6">
           <div className="space-y-3">
             <label className="panel-label">棋盘大小 · Board Size</label>
             <div className="flex gap-2">
@@ -89,7 +89,7 @@ export function Menu() {
         </div>
 
         {/* Usage instructions */}
-        <div className="glass-panel p-6 w-[21rem]">
+        <div className="glass-panel p-6 w-full max-w-sm">
           <h2 className="panel-label mb-4">使用说明 · How to Play</h2>
           <ul className="text-white/70 text-sm space-y-2.5 leading-relaxed">
             <li><span className="text-cyan-200/80">左键 / 右键点击</span>：选中格子进入预览（不落子）</li>

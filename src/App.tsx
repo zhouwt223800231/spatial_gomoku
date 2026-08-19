@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { useGameStore } from './store/gameStore';
 import { Position, Player } from './types';
@@ -20,6 +20,7 @@ import { GameHUD } from './components/UI/GameHUD';
 import { AIInsight } from './components/UI/AIInsight';
 import { StrategyRadar } from './components/UI/StrategyRadar';
 import { ProjectionMinimap } from './components/ProjectionMinimap';
+import { InfoDrawer } from './components/UI/InfoDrawer';
 
 const KEYMAP: Record<'xNeg' | 'xPos' | 'yNeg' | 'yPos' | 'zNeg' | 'zPos' | 'confirm' | 'cancel', readonly string[]> = {
   xNeg: ['a', 'arrowleft'],
@@ -63,6 +64,7 @@ export default function App() {
   const aiPlayer: Player = humanPlayer === 'black' ? 'white' : 'black';
   const aiTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const aiBlocksRef = useRef(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const fineModeRef = useRef(false);
 
   const placeAt = useCallback((pos: Position) => {
@@ -298,26 +300,28 @@ export default function App() {
       {gamePhase === 'menu' && <Menu />}
 
       {gamePhase === 'playing' && (
-        <div className="absolute inset-0 z-10 grid grid-cols-[auto_1fr_auto] grid-rows-[auto_1fr_auto] gap-3 p-4 pointer-events-none">
-          <GameHUD onConfirm={confirmPlace} onCancel={cancelPreview} />
+        <div className="absolute inset-0 z-10 grid grid-cols-1 md:grid-cols-[auto_1fr_auto] grid-rows-[auto_auto_1fr_auto] md:grid-rows-[auto_1fr_auto] gap-3 p-3 md:p-4 pointer-events-none overflow-hidden">
+          <GameHUD onConfirm={confirmPlace} onCancel={cancelPreview} onToggleDrawer={() => setDrawerOpen(!drawerOpen)} />
           <StrategyRadar />
           <ProjectionMinimap />
           {gameMode === 'ai' && <AIInsight />}
         </div>
       )}
 
+      <InfoDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
       {gamePhase === 'won' && !reviewMode && (
         <div className="absolute inset-0 z-20 flex items-center justify-center">
           <div className="absolute inset-0 victory-vignette" />
           <div className="relative text-center">
-            <h2 className={`victory-title text-6xl font-light tracking-widest mb-4 ${winner === 'black' ? 'victory-title--amber' : 'victory-title--blue'}`}>
+            <h2 style={{ fontSize: "clamp(2rem, 10vw, 3.75rem)" }} className={`victory-title font-light tracking-widest mb-4 ${winner === 'black' ? 'victory-title--amber' : 'victory-title--blue'}`}>
               {winner === 'black' ? 'Black Wins' : 'White Wins'}
             </h2>
             <p className="victory-subtitle text-white/50 text-sm uppercase tracking-widest mb-10">
               Five in a row in 3D space
             </p>
-            <div className="flex gap-3 justify-center">
-              <button onClick={dismissCelebration} className="glass-button victory-btn">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center items-stretch sm:items-center">
+              <button onClick={dismissCelebration} className="glass-button victory-btn px-6 py-2.5">
                 View Board
               </button>
               <button onClick={() => useGameStore.getState().resetGame()} className="glass-button victory-btn">
@@ -336,8 +340,8 @@ export default function App() {
           <div className="text-center">
             <h2 className="text-5xl font-light text-white/60 mb-4">Draw</h2>
             <p className="text-white/40 mb-8">Board is full</p>
-            <div className="flex gap-3 justify-center">
-              <button onClick={dismissCelebration} className="glass-button">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center items-stretch sm:items-center">
+              <button onClick={dismissCelebration} className="glass-button px-6 py-2.5">
                 View Board
               </button>
               <button onClick={() => useGameStore.getState().resetGame()} className="glass-button">
@@ -352,8 +356,8 @@ export default function App() {
       )}
 
       {(gamePhase === 'won' || gamePhase === 'draw') && reviewMode && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
-          <div className="glass-panel px-5 py-3 flex items-center gap-4">
+        <div className="absolute inset-x-3 top-3 md:inset-x-auto md:bottom-6 md:left-1/2 md:-translate-x-1/2 z-30">
+          <div className="glass-panel px-5 py-3 flex flex-wrap items-center justify-center gap-3 md:gap-4">
             <span className="panel-label">Reviewing final board</span>
             <button onClick={() => useGameStore.getState().resetGame()} className="glass-button text-sm">Play Again</button>
             <button onClick={() => useGameStore.setState({ gamePhase: 'menu' })} className="glass-button text-sm">Main Menu</button>

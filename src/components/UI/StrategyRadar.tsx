@@ -38,7 +38,7 @@ export function StrategyRadar() {
   const barColors = ['bg-cyan-400', 'bg-blue-400', 'bg-violet-400'];
 
   return (
-    <div className="col-start-1 row-start-2 self-start pointer-events-auto">
+    <div className="hidden md:block col-start-1 row-start-2 self-start pointer-events-auto">
       <div className="glass-panel p-5 w-40">
         <h3 className="panel-label mb-4">Strategy Radar</h3>
         <div className="space-y-3.5">
