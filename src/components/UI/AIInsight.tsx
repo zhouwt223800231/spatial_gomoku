@@ -8,7 +8,7 @@ export function AIInsight() {
   if (gameMode !== 'ai' || !visible) return null;
 
   return (
-    <div className="absolute bottom-24 right-6 z-10 w-64">
+    <div className="col-start-3 row-start-2 self-end pointer-events-auto w-64">
       <div className="glass-panel p-5">
         <div className="flex justify-between items-center mb-3">
           <h3 className="panel-label">AI Insight</h3>
@@ -17,8 +17,7 @@ export function AIInsight() {
             className="text-white/30 hover:text-white/70 text-xs leading-none px-1"
             aria-label="Close"
           >
-            ✕
-          </button>
+            鉁?          </button>
         </div>
         <div className="space-y-2.5 max-h-40 overflow-y-auto pr-1">
           {aiInsights.length === 0 ? (

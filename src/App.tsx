@@ -9,7 +9,6 @@ import { usePlayerProfile } from './hooks/usePlayerProfile';
 import { useAudio } from './hooks/useAudio';
 import { Board3D } from './components/Board3D';
 import { CameraController } from './components/CameraController';
-import { AxisGizmo } from './components/AxisGizmo';
 import { WebGLDiagnostic } from './components/WebGLDiagnostic';
 import { Starfield } from './components/Starfield';
 import { LiveLines } from './components/LiveLines';
@@ -57,6 +56,7 @@ export default function App() {
   const { profile, recordMove, recordGame } = usePlayerProfile();
   const { init, playPlaceSound, playVictoryChime, cancelVictoryChime } = useAudio();
   const aiPlayer: Player = humanPlayer === 'black' ? 'white' : 'black';
+  const aiTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const fineModeRef = useRef(false);
 
   const placeAt = useCallback((pos: Position) => {
@@ -183,14 +183,18 @@ export default function App() {
     if (currentPlayer !== ai) return;
 
     setAiThinking(true);
-    const { weights, maxDepth, insight } = getAdaptiveWeights(profile, movesCount);
-    if (insight) {
-      addAiInsight({ id: Date.now().toString(), type: 'adapted', message: insight, timestamp: Date.now() });
-    }
-    const move = findBestMove(stones, ai, boardSize, weights, maxDepth);
-    placeStone(move);
-    playPlaceSound(move, boardSize);
-    setAiThinking(false);
+    aiTimeoutRef.current = setTimeout(() => {
+      const { weights, maxDepth, insight } = getAdaptiveWeights(profile, movesCount);
+      if (insight) {
+        addAiInsight({ id: Date.now().toString(), type: 'adapted', message: insight, timestamp: Date.now() });
+      }
+      const move = findBestMove(stones, ai, boardSize, weights, maxDepth);
+      placeStone(move);
+      playPlaceSound(move, boardSize);
+      setAiThinking(false);
+    }, 800);
+
+    return () => clearTimeout(aiTimeoutRef.current);
   }, [currentPlayer, gameMode, gamePhase, stones, boardSize, profile, movesCount, humanPlayer, placeStone, playPlaceSound, addAiInsight, setAiThinking]);
 
   useEffect(() => {
@@ -221,7 +225,6 @@ export default function App() {
         <pointLight position={[-5, -5, -5]} intensity={0.25} color="#3b82f6" />
 
         <Starfield />
-        <AxisGizmo />
         <Board3D onCellSelect={handleCellSelect} />
         {gamePhase === 'playing' && <LiveLines />}
         <CameraController />
@@ -231,12 +234,12 @@ export default function App() {
       {gamePhase === 'menu' && <Menu />}
 
       {gamePhase === 'playing' && (
-        <>
+        <div className="absolute inset-0 z-10 grid grid-cols-[auto_1fr_auto] grid-rows-[auto_1fr_auto] gap-3 p-4 pointer-events-none">
           <GameHUD onConfirm={confirmPlace} onCancel={cancelPreview} />
           <StrategyRadar />
           <ProjectionMinimap />
           {gameMode === 'ai' && <AIInsight />}
-        </>
+        </div>
       )}
 
       {gamePhase === 'won' && (
