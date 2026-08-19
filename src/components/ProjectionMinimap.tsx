@@ -61,7 +61,7 @@ function MiniView({ axis, stones, boardSize, ghost }: MiniViewProps) {
           const [cx, cy] = project(s.position);
           const fill = s.player === 'black' ? '#1e293b' : '#f8fafc';
           const stroke = s.player === 'black' ? '#94a3b8' : '#64748b';
-          return <circle key={i} cx={cx} cy={cy} r={3.4} fill={fill} stroke={stroke} strokeWidth="1" />;
+          return <circle key={i} cx={cx} cy={cy} r={4} fill={fill} stroke={stroke} strokeWidth="1" />;
         })}
 
         {/* ghost preview */}

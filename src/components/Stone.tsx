@@ -41,6 +41,8 @@ export function Stone({ position, player, opacity = 1 }: StoneProps) {
           emissiveIntensity={player === 'black' ? 0.15 : 0.1}
           transparent
           opacity={opacity}
+          depthTest={false}
+          depthWrite={false}
         />
       </mesh>
       <mesh raycast={() => null} scale={1.07}>
@@ -50,6 +52,7 @@ export function Stone({ position, player, opacity = 1 }: StoneProps) {
           side={THREE.BackSide}
           transparent
           opacity={opacity * rimOpacity}
+          depthTest={false}
           depthWrite={false}
         />
       </mesh>

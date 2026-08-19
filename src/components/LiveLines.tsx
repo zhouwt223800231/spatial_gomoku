@@ -17,7 +17,7 @@ export function LiveLines() {
       const base = run.positions.length >= 4 ? 0.8 : 0.45;
       const points = run.positions.map((p) => new THREE.Vector3(p.x - offset, p.y - offset, p.z - offset));
       const geo = new THREE.BufferGeometry().setFromPoints(points);
-      const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: base });
+      const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: base, depthTest: false, depthWrite: false });
       const line = new THREE.Line(geo, mat);
       return { line, base, len: run.positions.length };
     });

@@ -31,6 +31,8 @@ export function GhostStone({ position, blocked = false }: GhostStoneProps) {
         metalness={0.1}
         emissive={emissive}
         emissiveIntensity={0.35}
+        depthTest={false}
+        depthWrite={false}
       />
     </mesh>
   );

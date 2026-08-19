@@ -27,7 +27,7 @@ export function WinLine({ positions, player }: WinLineProps) {
   const winLineObject = useMemo(() => {
     const points = positions.map(p => new THREE.Vector3(...p));
     const geo = new THREE.BufferGeometry().setFromPoints(points);
-    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
+    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false });
     return new THREE.Line(geo, mat);
   }, [positions, color]);
 
@@ -43,6 +43,8 @@ export function WinLine({ positions, player }: WinLineProps) {
             emissive={color}
             emissiveIntensity={0.5}
             roughness={0.1}
+            depthTest={false}
+            depthWrite={false}
           />
         </mesh>
       ))}

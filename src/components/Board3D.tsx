@@ -65,7 +65,7 @@ export function Board3D({ onCellLock, onCellPlace }: Board3DProps) {
   return (
     <group>
       {/* Main glass box (visual only) */}
-      <mesh raycast={() => null}>
+      <mesh raycast={() => null} renderOrder={-1}>
         <boxGeometry args={[boardSize, boardSize, boardSize]} />
         <meshPhysicalMaterial
           color="#1e293b"
@@ -74,28 +74,29 @@ export function Board3D({ onCellLock, onCellPlace }: Board3DProps) {
           roughness={0.12}
           metalness={0.55}
           clearcoat={0.6}
+          depthWrite={false}
         />
       </mesh>
 
       {/* Outer edges */}
-      <lineSegments raycast={() => null}>
+      <lineSegments raycast={() => null} renderOrder={-1}>
         <edgesGeometry args={[new THREE.BoxGeometry(boardSize, boardSize, boardSize)]} />
-        <lineBasicMaterial color="#38bdf8" transparent opacity={0.85} />
+        <lineBasicMaterial color="#38bdf8" transparent opacity={0.85} depthWrite={false} />
       </lineSegments>
 
       {/* Full 3D grid (dimmed, gives spatial context) */}
-      <lineSegments geometry={gridGeometry} raycast={() => null}>
-        <lineBasicMaterial color="#7dd3fc" transparent opacity={0.13} />
+      <lineSegments geometry={gridGeometry} raycast={() => null} renderOrder={-1}>
+        <lineBasicMaterial color="#7dd3fc" transparent opacity={0.13} depthWrite={false} />
       </lineSegments>
 
       {/* Slice plane (second brightest) */}
-      <mesh position={slice.pos} rotation={slice.rot} raycast={() => null}>
+      <mesh position={slice.pos} rotation={slice.rot} raycast={() => null} renderOrder={-1}>
         <planeGeometry args={[sliceSize, sliceSize]} />
         <meshBasicMaterial color="#67e8f9" transparent opacity={0.10} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
-      <lineSegments position={slice.pos} rotation={slice.rot} raycast={() => null}>
+      <lineSegments position={slice.pos} rotation={slice.rot} raycast={() => null} renderOrder={-1}>
         <edgesGeometry args={[new THREE.PlaneGeometry(sliceSize, sliceSize)]} />
-        <lineBasicMaterial color="#67e8f9" transparent opacity={0.6} />
+        <lineBasicMaterial color="#67e8f9" transparent opacity={0.6} depthWrite={false} />
       </lineSegments>
 
       {/* Cursor cell highlight (only when not aiming with a ghost) */}
