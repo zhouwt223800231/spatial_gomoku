@@ -94,7 +94,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     boardSize: state.boardSize,
     humanPlayer: state.humanPlayer,
     activeLayer: centerOf(state.boardSize),
-    currentPlayer: state.gameMode === 'ai' && state.humanPlayer === 'white' ? 'white' : 'black',
+    currentPlayer: 'black' as Player, // 黑棋先手
     gamePhase: 'playing',
   })),
 
@@ -137,7 +137,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     boardSize: get().boardSize,
     humanPlayer: get().humanPlayer,
     activeLayer: centerOf(get().boardSize),
-    currentPlayer: get().gameMode === 'ai' && get().humanPlayer === 'white' ? 'white' : 'black',
+    currentPlayer: 'black' as Player, // 黑棋先手
   }),
 
   undoMove: () => set((state) => {
