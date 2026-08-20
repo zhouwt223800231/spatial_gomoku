@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
+import * as THREE from 'three';
 import { useGameStore } from './store/gameStore';
 import { Position, Player } from './types';
 import { checkWin, isDraw } from './game/rules';
@@ -68,6 +69,22 @@ export default function App() {
   const aiBlocksRef = useRef(0);
   const aiThreatFeaturesRef = useRef<{ feature: ReturnType<typeof computeThreatFeature> }[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Camera instance that actually swaps when viewMode toggles (R3F only
+  // replaces its default camera when given an instance or on remount).
+  const camera = useMemo(() => {
+    if (viewMode === 'orthographic') {
+      const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
+      cam.position.set(6, 6, 6);
+      cam.zoom = 1;
+      cam.lookAt(0, 0, 0);
+      return cam;
+    }
+    const cam = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+    cam.position.set(5, 5, 5);
+    cam.lookAt(0, 0, 0);
+    return cam;
+  }, [viewMode]);
   const fineModeRef = useRef(false);
   // Mobile: track whether the board canvas must be inset between the
   // top status bar and the bottom operation stack (auto-adjusts when
@@ -354,9 +371,7 @@ export default function App() {
       <Canvas
         dpr={[1, 2]}
         orthographic={viewMode === 'orthographic'}
-        camera={viewMode === 'orthographic'
-          ? { position: [6, 6, 6], zoom: 1, near: -100, far: 100, left: -1, right: 1, top: 1, bottom: -1 }
-          : { position: [5, 5, 5], fov: 45, near: 0.1, far: 200 }}
+        camera={camera}
         gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
       >
         <fog attach="fog" args={['#0b1020', 10, 30]} />
@@ -459,3 +474,4 @@ export default function App() {
     </div>
   );
 }
+

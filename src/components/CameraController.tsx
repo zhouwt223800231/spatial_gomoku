@@ -60,6 +60,10 @@ export function CameraController() {
     } else {
       const cam = camera as THREE.PerspectiveCamera;
       const fov = cam.fov || 45;
+      // A freshly swapped-in camera may not have been resized by R3F yet;
+      // set the aspect explicitly so the 3D view is correct after toggling.
+      cam.aspect = aspect;
+      cam.updateProjectionMatrix();
       let dist = (boardSize / 2) / Math.sin((fov * Math.PI) / 360) * 1.25;
       if (aspect < 1) {
         // Portrait: the horizontal FOV is narrower, so also fit the board
@@ -232,3 +236,4 @@ export function CameraController() {
 
   return null;
 }
+
