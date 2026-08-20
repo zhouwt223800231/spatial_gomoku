@@ -76,6 +76,7 @@ export default function App() {
   const [uiInset, setUiInset] = useState({ top: 0, bottom: 0 });
   const topUiRef = useRef<HTMLDivElement>(null);
   const bottomUiRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const placeAt = useCallback((pos: Position) => {
     const st = useGameStore.getState();
@@ -194,11 +195,17 @@ export default function App() {
   // bottom operation stack so the canvas band can sit exactly between them.
   useEffect(() => {
     const measure = () => {
+      // Measure insets relative to the root (100dvh) container so the canvas
+      // band math stays correct even when 100dvh differs from window.innerHeight
+      // (common on mobile browsers with dynamic toolbars).
+      const root = rootRef.current?.getBoundingClientRect();
       const t = topUiRef.current?.getBoundingClientRect();
       const b = bottomUiRef.current?.getBoundingClientRect();
+      const rootTop = root ? root.top : 0;
+      const rootBottom = root ? root.bottom : (typeof window !== 'undefined' ? window.innerHeight : 0);
       setUiInset({
-        top: t ? Math.max(0, t.bottom) : 0,
-        bottom: b ? Math.max(0, window.innerHeight - b.top) : 0,
+        top: t ? Math.max(0, t.bottom - rootTop) : 0,
+        bottom: b ? Math.max(0, rootBottom - b.top) : 0,
       });
     };
     measure();
@@ -336,7 +343,7 @@ export default function App() {
   };
 
   return (
-    <div className="w-screen relative space-bg" style={{ height: "100dvh" }} onContextMenu={(e) => e.preventDefault()}>
+    <div ref={rootRef} className="w-screen relative space-bg" style={{ height: "100dvh" }} onContextMenu={(e) => e.preventDefault()}>
       <div
         className="absolute left-0 right-0"
         style={{
@@ -359,7 +366,7 @@ export default function App() {
         <pointLight position={[-5, -5, -5]} intensity={0.25} color="#3b82f6" />
 
         <Starfield />
-        <Board3D onCellSelect={handleCellSelect} />
+        {gamePhase !== 'menu' && <Board3D onCellSelect={handleCellSelect} />}
         {(gamePhase === 'playing' || reviewMode) && <LiveLines />}
         <CameraController />
         <WebGLDiagnostic />

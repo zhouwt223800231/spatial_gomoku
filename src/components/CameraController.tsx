@@ -106,8 +106,7 @@ export function CameraController() {
     controls.minDistance = 3;
     controls.maxDistance = boardSize * 3;
     controls.target.set(0, 0, 0);
-    controls.autoRotate = gamePhase === 'menu';
-    controls.autoRotateSpeed = 0.5;
+    controls.autoRotate = false;
     controls.update();
     controlsRef.current = controls;
     return () => {
