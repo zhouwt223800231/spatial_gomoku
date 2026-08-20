@@ -12,7 +12,7 @@ const HALO_START = 3.2;
 const END = 4.8;
 
 // Denser core: more particles per stone.
-const PARTICLES_PER_STONE = 160;
+const PARTICLES_PER_STONE = 200;
 // Short trails only while flying (avoids clutter once gathered).
 const TRAIL_LENGTH = 3;
 
@@ -94,9 +94,15 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
         if (away.lengthSq() < 0.01) away.set(0, 1, 0);
         away.normalize();
         const ctrl = s.clone().add(toCenter.clone().multiplyScalar(0.5)).add(away.multiplyScalar(0.5 + Math.random() * 0.7));
-        const hd = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
-        if (hd.lengthSq() < 0.01) hd.set(1, 0, 0);
-        hd.normalize();
+        // Uniform spherical direction (Box-Muller) so the halo is even, not
+        // clustered toward cube diagonals.
+        const u1 = Math.random(), u2 = Math.random();
+        const r = Math.sqrt(-2 * Math.log(u1 + 1e-9));
+        const hd = new THREE.Vector3(
+          r * Math.cos(2 * Math.PI * u2),
+          r * Math.sin(2 * Math.PI * u2),
+          Math.sqrt(-2 * Math.log(u2 + 1e-9)),
+        ).normalize();
         list.push({
           start: s.clone(),
           ctrl,
