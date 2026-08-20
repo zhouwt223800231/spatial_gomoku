@@ -12,7 +12,7 @@ const HALO_START = 3.2;
 const END = 4.8;
 
 // Denser core: more particles per stone.
-const PARTICLES_PER_STONE = 200;
+const BASE_PER_STONE = 120; // scaled by board size so large boards stay dense
 // Short trails only while flying (avoids clutter once gathered).
 const TRAIL_LENGTH = 3;
 
@@ -81,15 +81,18 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
     return max; // world units from origin to far edge
   }, [positions]);
 
+  // Density scales with the board so the halo stays full on 7³/9³ too.
+  const perStone = Math.max(60, Math.round(BASE_PER_STONE * boardScale));
+
   const { particles, positionsArray, geometry, total } = useMemo(() => {
     const list: Particle[] = [];
-    const totalN = n * PARTICLES_PER_STONE;
+    const totalN = n * perStone;
     const arr = new Float32Array(totalN * 3);
     let i = 0;
     positions.forEach((p) => {
       const s = new THREE.Vector3(...p);
       const toCenter = centerVec.clone().sub(s);
-      for (let k = 0; k < PARTICLES_PER_STONE; k++) {
+      for (let k = 0; k < perStone; k++) {
         const away = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
         if (away.lengthSq() < 0.01) away.set(0, 1, 0);
         away.normalize();
@@ -107,7 +110,7 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
           start: s.clone(),
           ctrl,
           end: centerVec.clone(),
-          birth: (k / PARTICLES_PER_STONE) * 0.5 + Math.random() * 0.15,
+          birth: (k / perStone) * 0.5 + Math.random() * 0.15,
           speed: 0.5 + Math.random() * 0.45,
           size: 0.09 + Math.random() * 0.09,
           haloDir: hd,
@@ -121,7 +124,7 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
     return { particles: list, positionsArray: arr, geometry: geo, total: totalN };
-  }, [positions, centerVec, n]);
+  }, [positions, centerVec, n, perStone]);
 
   const sprite = useMemo(() => makeSoftSprite(), []);
 
