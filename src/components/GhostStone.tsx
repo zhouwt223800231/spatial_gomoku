@@ -22,7 +22,7 @@ export function GhostStone({ position, blocked = false }: GhostStoneProps) {
 
   return (
     <mesh ref={meshRef} position={position} raycast={() => null}>
-      <sphereGeometry args={[0.38, 32, 32]} />
+      <sphereGeometry args={[0.38, 16, 16]} />
       <meshPhysicalMaterial
         color={color}
         transparent

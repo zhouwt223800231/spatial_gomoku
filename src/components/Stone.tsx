@@ -8,18 +8,25 @@ interface StoneProps {
   opacity?: number;
 }
 
+const SPHERE_SEGMENTS = 16; // was 32; visually identical at this size
+
 export function Stone({ position, player, opacity = 1 }: StoneProps) {
   const groupRef = useRef<THREE.Group>(null);
   const scaleRef = useRef(0);
+  const doneRef = useRef(false);
 
   useFrame((_, delta) => {
-    if (scaleRef.current < 1) {
-      scaleRef.current = Math.min(1, scaleRef.current + delta * 4);
-      if (groupRef.current) {
-        const s = scaleRef.current;
-        const bounce = s < 0.9 ? s * 1.1 : 1 - (s - 0.9) * 0.5;
-        groupRef.current.scale.setScalar(Math.max(0.1, bounce));
-      }
+    // Animate only while the stone is settling; skip all subsequent frames.
+    if (doneRef.current) return;
+    scaleRef.current = Math.min(1, scaleRef.current + delta * 4);
+    if (groupRef.current) {
+      const s = scaleRef.current;
+      const bounce = s < 0.9 ? s * 1.1 : 1 - (s - 0.9) * 0.5;
+      groupRef.current.scale.setScalar(Math.max(0.1, bounce));
+    }
+    if (scaleRef.current >= 1) {
+      groupRef.current?.scale.setScalar(1);
+      doneRef.current = true;
     }
   });
 
@@ -30,7 +37,7 @@ export function Stone({ position, player, opacity = 1 }: StoneProps) {
   return (
     <group ref={groupRef} position={position} scale={0}>
       <mesh raycast={() => null}>
-        <sphereGeometry args={[0.38, 32, 32]} />
+        <sphereGeometry args={[0.38, SPHERE_SEGMENTS, SPHERE_SEGMENTS]} />
         <meshPhysicalMaterial
           color={baseColor}
           roughness={player === 'black' ? 0.15 : 0.3}
@@ -46,7 +53,7 @@ export function Stone({ position, player, opacity = 1 }: StoneProps) {
         />
       </mesh>
       <mesh raycast={() => null} scale={1.07}>
-        <sphereGeometry args={[0.38, 32, 32]} />
+        <sphereGeometry args={[0.38, SPHERE_SEGMENTS, SPHERE_SEGMENTS]} />
         <meshBasicMaterial
           color={rimColor}
           side={THREE.BackSide}

@@ -51,7 +51,7 @@ export const DEFAULT_WEIGHTS: EvalWeights = {
   THREAT_DIAG: 0,
 };
 
-const keyOf = (p: Position) => `${p.x},${p.y},${p.z}`;
+const keyOf = (p: Position, size: number) => (p.x * size + p.y) * size + p.z;
 
 const inBounds = (p: Position, boardSize: BoardSize) =>
   p.x >= 0 && p.x < boardSize && p.y >= 0 && p.y < boardSize && p.z >= 0 && p.z < boardSize;
@@ -67,8 +67,8 @@ export function evaluatePosition(
   boardSize: BoardSize,
   weights: EvalWeights = DEFAULT_WEIGHTS
 ): number {
-  const stoneMap = new Map<string, Player>();
-  stones.forEach((s) => stoneMap.set(keyOf(s.position), s.player));
+  const stoneMap = new Map<number, Player>();
+  stones.forEach((s) => stoneMap.set(keyOf(s.position, boardSize), s.player));
 
   const wantThreats =
     weights.DOUBLE_THREAT > 0 || weights.THREAT_AXIS > 0 || weights.THREAT_Z > 0 || weights.THREAT_DIAG > 0;
@@ -87,13 +87,13 @@ export function evaluatePosition(
     for (const dir of DIRECTIONS) {
       // Only start a segment at its first stone (no same player right behind).
       const behind: Position = { x: stone.position.x - dir.x, y: stone.position.y - dir.y, z: stone.position.z - dir.z };
-      if (inBounds(behind, boardSize) && stoneMap.get(keyOf(behind)) === p) continue;
+      if (inBounds(behind, boardSize) && stoneMap.get(keyOf(behind, boardSize)) === p) continue;
 
       // Extend the segment forward.
       const seg: Position[] = [stone.position];
       for (let i = 1; i < 5; i++) {
         const q = { x: stone.position.x + dir.x * i, y: stone.position.y + dir.y * i, z: stone.position.z + dir.z * i };
-        if (!inBounds(q, boardSize) || stoneMap.get(keyOf(q)) !== p) break;
+        if (!inBounds(q, boardSize) || stoneMap.get(keyOf(q, boardSize)) !== p) break;
         seg.push(q);
       }
       if (seg.length < 2) continue;
@@ -101,7 +101,7 @@ export function evaluatePosition(
       const last = seg[seg.length - 1];
       const e1: Position = { x: last.x + dir.x, y: last.y + dir.y, z: last.z + dir.z };
       const e2: Position = { x: stone.position.x - dir.x, y: stone.position.y - dir.y, z: stone.position.z - dir.z };
-      const open = (q: Position) => inBounds(q, boardSize) && !stoneMap.has(keyOf(q));
+      const open = (q: Position) => inBounds(q, boardSize) && !stoneMap.has(keyOf(q, boardSize));
       const openEnds = (open(e1) ? 1 : 0) + (open(e2) ? 1 : 0);
 
       const len = seg.length;

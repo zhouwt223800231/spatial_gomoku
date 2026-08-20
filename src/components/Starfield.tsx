@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
 
-export function Starfield({ count = 320, radius = 30 }: { count?: number; radius?: number }) {
+export function Starfield({ count = 160, radius = 30 }: { count?: number; radius?: number }) {
   const positions = useMemo(() => {
     const arr = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {

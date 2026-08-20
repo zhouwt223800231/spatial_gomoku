@@ -23,14 +23,16 @@ export function LiveLines() {
     });
   }, [stones, boardSize, showLines]);
 
-  const pulseRef = useRef<{ mat: THREE.LineBasicMaterial; base: number; len: number }[]>([]);
-  pulseRef.current = lines.map((l) => ({ mat: l.line.material as THREE.LineBasicMaterial, base: l.base, len: l.len }));
+  const pulseRef = useRef<{ mat: THREE.LineBasicMaterial; base: number }[]>([]);
+  pulseRef.current = lines.filter((l) => l.len >= 4).map((l) => ({ mat: l.line.material as THREE.LineBasicMaterial, base: l.base }));
+  const hasPulse = pulseRef.current.length > 0;
 
   useFrame((state) => {
+    // Only run the breathing animation when there are 4+ runs to pulse.
+    if (!hasPulse) return;
+    const t = state.clock.elapsedTime;
     for (const item of pulseRef.current) {
-      if (item.len >= 4) {
-        item.mat.opacity = item.base * (0.7 + 0.3 * Math.sin(state.clock.elapsedTime * 4));
-      }
+      item.mat.opacity = item.base * (0.7 + 0.3 * Math.sin(t * 4));
     }
   });
 

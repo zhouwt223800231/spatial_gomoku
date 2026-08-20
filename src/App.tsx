@@ -301,12 +301,13 @@ export default function App() {
   return (
     <div className="w-screen relative space-bg" style={{ height: "100dvh" }} onContextMenu={(e) => e.preventDefault()}>
       <Canvas
+        dpr={[1, 2]}
         key={viewMode}
         orthographic={viewMode === 'orthographic'}
         camera={viewMode === 'orthographic'
           ? { position: [6, 6, 6], zoom: 1, near: -100, far: 100, left: -1, right: 1, top: 1, bottom: -1 }
           : { position: [5, 5, 5], fov: 45, near: 0.1, far: 200 }}
-        gl={{ alpha: true, antialias: true }}
+        gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
       >
         <fog attach="fog" args={['#0b1020', 10, 30]} />
         <ambientLight intensity={0.45} />
