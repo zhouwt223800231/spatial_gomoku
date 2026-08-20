@@ -11,9 +11,9 @@ interface StarfieldProps {
 
 // Fraction of the fixed far-star pool revealed per board size (5/7/9).
 const VISIBLE_BY_SIZE: Record<number, number> = { 5: 0.36, 7: 0.62, 9: 1.0 };
-const DUST_COUNT = 36;
-const DIM_MENU = 0.9; // brightness in the main menu
-const DIM_GAME = 0.5; // dimmer + static during gameplay (less distraction)
+const DUST_COUNT = 60;
+const DIM_MENU = 1.0; // brightness in the main menu
+const DIM_GAME = 0.55; // dimmer + static during gameplay (less distraction)
 
 const FAR_VERT = `
 attribute float aReveal;
@@ -27,7 +27,7 @@ varying float vAlpha;
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   gl_Position = projectionMatrix * mv;
-  gl_PointSize = uSize * (uScale / max(0.1, -mv.z));
+  gl_PointSize = min(uSize * (uScale / max(0.1, -mv.z)), 16.0);
   float reveal = smoothstep(aReveal, aReveal + 0.04, uVisible);
   float tw = 1.0 + (uTwinkle > 0.5 ? 0.14 * sin(uTime * 2.0 + position.x * 6.0 + position.y * 4.0) : 0.0);
   vAlpha = reveal * uBrightness * tw;
@@ -52,7 +52,7 @@ void main() {
  *   smoothly via a per-star reveal threshold; coordinates and rotation phase
  *   never regenerate, so switching board size never resets the animation.
  */
-export function Starfield({ maxCount = 180, radius = 30, animate: animateProp }: StarfieldProps) {
+export function Starfield({ maxCount = 6000, radius = 30, animate: animateProp }: StarfieldProps) {
   const gl = useThree((s) => s.gl);
   const gamePhase = useGameStore((s) => s.gamePhase);
   const boardSize = useGameStore((s) => s.boardSize);
@@ -72,7 +72,7 @@ export function Starfield({ maxCount = 180, radius = 30, animate: animateProp }:
     for (let i = 0; i < maxCount; i++) {
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
-      const r = radius * (0.55 + Math.random() * 0.45);
+      const r = radius * (0.4 + Math.random() * 0.4);
       pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
       pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
       pos[i * 3 + 2] = r * Math.cos(phi);
@@ -98,7 +98,7 @@ export function Starfield({ maxCount = 180, radius = 30, animate: animateProp }:
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const uniforms = useMemo(() => ({
     uVisible: { value: visibleRef.current },
-    uSize: { value: 0.1 },
+    uSize: { value: 0.24 },
     uScale: { value: 300 },
     uTime: { value: 0 },
     uTwinkle: { value: animate ? 1 : 0 },
