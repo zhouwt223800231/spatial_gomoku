@@ -162,7 +162,7 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
         // Gathered near the core: damped micro-orbit. The orbit plane is
         // perpendicular to haloDir so the halo expands from the same line.
         const a = p.orbit.angle + t * p.orbit.speed;
-        const rr = p.orbit.radius * (1 - orbit * 0.7);
+        const rr = p.orbit.radius * (1 - orbit); // -> 0 so halo continues on-axis
         const up = Math.abs(p.haloDir.y) < 0.9
           ? new THREE.Vector3(0, 1, 0)
           : new THREE.Vector3(1, 0, 0);
@@ -274,6 +274,7 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
           key={k}
           position={centerVec}
           visible={false}
+          rotation={k === 0 ? [Math.PI / 2, 0, 0] : k === 1 ? [0, Math.PI / 2, 0] : [0, 0, 0]}
           ref={(el) => { haloRingRefs.current[k] = el; }}
           raycast={() => null}
         >
