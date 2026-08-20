@@ -11,7 +11,7 @@ const ORBIT_START = 2.4;
 const HALO_START = 3.2;
 const END = 4.6;
 
-const PARTICLES_PER_STONE = 16;
+const PARTICLES_PER_STONE = 22;
 const TRAIL_LENGTH = 8;      // history points per particle
 const HALO_MAX_RADIUS = 1.4;
 
@@ -154,19 +154,24 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
       const ease = u * u * (3 - 2 * u);
 
       if (halo > 0) {
-        // Halo: continue smoothly outward along the precomputed direction
-        // from the gathered position (no jump).
-        const r = 0.15 + halo * HALO_MAX_RADIUS;
+        // Halo: expand along haloDir, starting from the gathered offset (0.05)
+        // so it continues seamlessly from the orbit phase.
+        const r = 0.05 + halo * HALO_MAX_RADIUS;
         tmp.copy(p.haloDir).multiplyScalar(r).add(p.end);
       } else if (u >= 1) {
-        // Gathered near the core: damped micro-orbit.
+        // Gathered near the core: damped micro-orbit. The orbit plane is
+        // perpendicular to haloDir so the halo expands from the same line.
         const a = p.orbit.angle + t * p.orbit.speed;
-        const rr = p.orbit.radius * (1 - orbit * 0.6);
-        tmp.set(
-          p.end.x + Math.cos(a) * rr,
-          p.end.y + Math.sin(p.seed) * 0.02,
-          p.end.z + Math.sin(a) * rr,
-        );
+        const rr = p.orbit.radius * (1 - orbit * 0.7);
+        const up = Math.abs(p.haloDir.y) < 0.9
+          ? new THREE.Vector3(0, 1, 0)
+          : new THREE.Vector3(1, 0, 0);
+        const tan = new THREE.Vector3().crossVectors(p.haloDir, up).normalize();
+        const bin = new THREE.Vector3().crossVectors(p.haloDir, tan).normalize();
+        tmp.copy(p.end)
+          .addScaledVector(tan, Math.cos(a) * rr)
+          .addScaledVector(bin, Math.sin(a) * rr)
+          .addScaledVector(p.haloDir, 0.05);
       } else if (u > 0) {
         const inv = 1 - ease;
         tmp.copy(p.start).multiplyScalar(inv * inv)
