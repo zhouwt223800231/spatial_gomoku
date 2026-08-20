@@ -10,7 +10,7 @@ interface StarfieldProps {
 }
 
 // Fraction of the fixed far-star pool revealed per board size (5/7/9).
-const VISIBLE_BY_SIZE: Record<number, number> = { 5: 0.36, 7: 0.62, 9: 1.0 };
+const VISIBLE_BY_SIZE: Record<number, number> = { 5: 0.42, 7: 0.68, 9: 1.0 };
 const DUST_COUNT = 60;
 const DIM_MENU = 1.0; // brightness in the main menu
 const DIM_GAME = 0.55; // dimmer + static during gameplay (less distraction)
@@ -52,7 +52,7 @@ void main() {
  *   smoothly via a per-star reveal threshold; coordinates and rotation phase
  *   never regenerate, so switching board size never resets the animation.
  */
-export function Starfield({ maxCount = 6000, radius = 30, animate: animateProp }: StarfieldProps) {
+export function Starfield({ maxCount = 1750, radius = 30, animate: animateProp }: StarfieldProps) {
   const gl = useThree((s) => s.gl);
   const gamePhase = useGameStore((s) => s.gamePhase);
   const boardSize = useGameStore((s) => s.boardSize);
@@ -63,7 +63,7 @@ export function Starfield({ maxCount = 6000, radius = 30, animate: animateProp }
   const matRef = useRef<THREE.ShaderMaterial>(null);
   const fgMatRef = useRef<THREE.PointsMaterial>(null);
 
-  const targetVisible = VISIBLE_BY_SIZE[boardSize] ?? 0.36;
+  const targetVisible = VISIBLE_BY_SIZE[boardSize] ?? 0.42;
   const visibleRef = useRef(targetVisible);
 
   const farData = useMemo(() => {
@@ -108,8 +108,8 @@ export function Starfield({ maxCount = 6000, radius = 30, animate: animateProp }
   useFrame((state, delta) => {
     // Always drive the reveal threshold toward the current board size (stable
     // in-game; smoothly fades in/out when the player changes board size).
-    const target = VISIBLE_BY_SIZE[boardSize] ?? 0.36;
-    visibleRef.current = THREE.MathUtils.damp(visibleRef.current, target, 1.8, delta);
+    const target = VISIBLE_BY_SIZE[boardSize] ?? 0.42;
+    visibleRef.current = THREE.MathUtils.damp(visibleRef.current, target, 1.2, delta);
 
     if (matRef.current) {
       const u = matRef.current.uniforms;
