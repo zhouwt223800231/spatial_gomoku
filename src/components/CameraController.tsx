@@ -4,10 +4,11 @@ import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import { useGameStore } from '../store/gameStore';
 
+const FREEZE_END = 1.2;      // phase 0: freeze & slow push-in
 const IGNITE_END = 1.8;      // phase 1: line grows / stones ignite (camera holds)
-const APPROACH_END = 3.0;    // phase 2: camera eases to the fixed 45鎺?pose
-const ORBIT_DURATION = 3.0;  // phase 3: 360鎺?orbit (ends at APPROACH_END + ORBIT_DURATION)
-const ORBIT_ANGLE = Math.PI / 4; // fixed 45鎺?inclination to the winning line
+const APPROACH_END = 3.0;    // phase 2: camera eases to the fixed 45°pose
+const ORBIT_DURATION = 3.0;  // phase 3: 360°orbit (ends at APPROACH_END + ORBIT_DURATION)
+const ORBIT_ANGLE = Math.PI / 4; // fixed 45°inclination to the winning line
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 const easeInOutCubic = (t: number) =>
@@ -139,8 +140,17 @@ export function CameraController() {
 
       if (controls) controls.enabled = false;
 
-      if (t < APPROACH_END) {
-        // Phase 1 (hold, watch the line grow) + Phase 2 (ease to the 45鎺?pose).
+      if (t < FREEZE_END) {
+        // Phase 0: frozen moment - very slow push-in toward the winning line.
+        if (approachStartPosRef.current === null) {
+          approachStartPosRef.current = camera.position.clone();
+        }
+        const p = easeInOutCubic(t / FREEZE_END);
+        const target = approachStartPosRef.current.clone().lerp(mid, p * 0.05);
+        camera.position.copy(target);
+        camera.lookAt(mid);
+      } else if (t < APPROACH_END) {
+        // Phase 1 (hold, watch the line grow) + Phase 2 (ease to the 45°pose).
         if (approachStartPosRef.current === null) {
           approachStartPosRef.current = camera.position.clone();
         }
@@ -148,7 +158,7 @@ export function CameraController() {
         camera.position.lerpVectors(approachStartPosRef.current, orbitStart, p);
         camera.lookAt(mid);
       } else if (!orbitDoneRef.current && t <= APPROACH_END + ORBIT_DURATION) {
-        // Phase 3: 360鎺?orbit from the 45鎺?pose.
+        // Phase 3: 360°orbit from the 45°pose.
         const p = easeInOut(Math.min(1, (t - APPROACH_END) / ORBIT_DURATION));
         const angle = p * Math.PI * 2;
         const pos = mid.clone()
