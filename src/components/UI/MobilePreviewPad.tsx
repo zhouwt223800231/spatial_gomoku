@@ -43,35 +43,32 @@ export function MobilePreviewPad({ onMove, onConfirm, onCancel }: MobilePreviewP
         </div>
       </div>
 
-      {/* D-pad drawer */}
+      {/* D-pad drawer (in-flow: the board canvas band shrinks so the board is never covered) */}
       {padOpen && (
-        <div className="fixed inset-0 z-20 flex flex-col justify-end">
-          <div className="absolute inset-0 bg-[#070b16]/40" onClick={closePad} />
-          <div className="relative pointer-events-auto w-full max-w-md mx-auto mb-2 px-3">
-            <div className="glass-panel p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="panel-label">调整预览</span>
-                <button onClick={closePad} className="glass-button px-2 py-1 text-xs">收起 ▾</button>
+        <div className="w-full max-w-md mx-auto">
+          <div className="glass-panel p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="panel-label">调整预览</span>
+              <button onClick={closePad} className="glass-button px-2 py-1 text-xs">收起 ▾</button>
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <button className={btn} onClick={() => onMove('z', -1)} disabled={activeLayer === 0}>Z−</button>
+              <div className="grid grid-cols-3 gap-1">
+                <div />
+                <button className={btn} onClick={() => onMove('y', 1)}>↑</button>
+                <div />
+                <button className={btn} onClick={() => onMove('x', -1)}>←</button>
+                <div />
+                <button className={btn} onClick={() => onMove('x', 1)}>→</button>
+                <div />
+                <button className={btn} onClick={() => onMove('y', -1)}>↓</button>
+                <div />
               </div>
-              <div className="flex items-center justify-center gap-2">
-                <button className={btn} onClick={() => onMove('z', -1)} disabled={activeLayer === 0}>Z−</button>
-                <div className="grid grid-cols-3 gap-1">
-                  <div />
-                  <button className={btn} onClick={() => onMove('y', 1)}>↑</button>
-                  <div />
-                  <button className={btn} onClick={() => onMove('x', -1)}>←</button>
-                  <div />
-                  <button className={btn} onClick={() => onMove('x', 1)}>→</button>
-                  <div />
-                  <button className={btn} onClick={() => onMove('y', -1)}>↓</button>
-                  <div />
-                </div>
-                <button className={btn} onClick={() => onMove('z', 1)} disabled={activeLayer === boardSize - 1}>Z+</button>
-              </div>
-              <div className="flex gap-2 justify-center">
-                <button onClick={() => { onConfirm(); closePad(); }} className="glass-button--primary flex-1 py-2 text-sm">✓ 落子</button>
-                <button onClick={() => { onCancel(); closePad(); }} className="glass-button flex-1 py-2 text-sm">✕ 取消</button>
-              </div>
+              <button className={btn} onClick={() => onMove('z', 1)} disabled={activeLayer === boardSize - 1}>Z+</button>
+            </div>
+            <div className="flex gap-2 justify-center">
+              <button onClick={() => { onConfirm(); closePad(); }} className="glass-button--primary flex-1 py-2 text-sm">✓ 落子</button>
+              <button onClick={() => { onCancel(); closePad(); }} className="glass-button flex-1 py-2 text-sm">✕ 取消</button>
             </div>
           </div>
         </div>

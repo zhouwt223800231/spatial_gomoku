@@ -69,6 +69,13 @@ export default function App() {
   const aiThreatFeaturesRef = useRef<{ feature: ReturnType<typeof computeThreatFeature> }[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const fineModeRef = useRef(false);
+  // Mobile: track whether the board canvas must be inset between the
+  // top status bar and the bottom operation stack (auto-adjusts when
+  // the D-pad drawer opens / closes).
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches);
+  const [uiInset, setUiInset] = useState({ top: 0, bottom: 0 });
+  const topUiRef = useRef<HTMLDivElement>(null);
+  const bottomUiRef = useRef<HTMLDivElement>(null);
 
   const placeAt = useCallback((pos: Position) => {
     const st = useGameStore.getState();
@@ -174,6 +181,32 @@ export default function App() {
       window.removeEventListener('keydown', onFirstGesture);
     };
   }, [init]);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const onChange = () => setIsMobile(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // Measure the real screen-space occupied by the top status bar and the
+  // bottom operation stack so the canvas band can sit exactly between them.
+  useEffect(() => {
+    const measure = () => {
+      const t = topUiRef.current?.getBoundingClientRect();
+      const b = bottomUiRef.current?.getBoundingClientRect();
+      setUiInset({
+        top: t ? Math.max(0, t.bottom) : 0,
+        bottom: b ? Math.max(0, window.innerHeight - b.top) : 0,
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (topUiRef.current) ro.observe(topUiRef.current);
+    if (bottomUiRef.current) ro.observe(bottomUiRef.current);
+    return () => ro.disconnect();
+  }, [gamePhase]);
 
   useEffect(() => {
     if (stones.length === 0) return;
@@ -304,6 +337,13 @@ export default function App() {
 
   return (
     <div className="w-screen relative space-bg" style={{ height: "100dvh" }} onContextMenu={(e) => e.preventDefault()}>
+      <div
+        className="absolute left-0 right-0"
+        style={{
+          top: isMobile ? uiInset.top : 0,
+          height: isMobile ? `calc(100dvh - ${uiInset.top + uiInset.bottom}px)` : '100%',
+        }}
+      >
       <Canvas
         dpr={[1, 2]}
         orthographic={viewMode === 'orthographic'}
@@ -324,6 +364,7 @@ export default function App() {
         <CameraController />
         <WebGLDiagnostic />
       </Canvas>
+      </div>
 
       {gamePhase === 'menu' && <Menu />}
 
@@ -331,9 +372,9 @@ export default function App() {
         <>
           {/* Mobile: single flex column - status bar, board, bottom bar (+ preview pad) */}
           <div className="absolute inset-0 z-10 flex md:hidden flex-col pointer-events-none p-3">
-            <div className="pointer-events-auto"><StatusBar /></div>
+            <div ref={topUiRef} className="pointer-events-auto"><StatusBar /></div>
             <div className="flex-1" />
-            <div className="pointer-events-auto flex flex-col items-center gap-2">
+            <div ref={bottomUiRef} className="pointer-events-auto flex flex-col items-center gap-2">
               <MobilePreviewPad onMove={moveGhost} onConfirm={confirmPlace} onCancel={cancelPreview} />
               <BottomBar onToggleDrawer={() => setDrawerOpen(true)} />
             </div>

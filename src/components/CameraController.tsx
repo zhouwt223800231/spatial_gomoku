@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
@@ -27,15 +27,17 @@ export function CameraController() {
   const approachStartQuatRef = useRef<THREE.Quaternion | null>(null);
   const orbitDoneRef = useRef(false);
 
-  // Fit the whole board into view whenever size / view / overview changes.
-  useEffect(() => {
+  // Fit the whole board into view whenever size / view / overview changes or
+  // when the canvas element resizes (e.g. the mobile D-pad drawer opens and
+  // the board band shrinks so the board is never covered).
+  const fitToBoard = useCallback(() => {
     const dir = new THREE.Vector3(1, 1, 1).normalize();
     const isOrtho = (camera as THREE.OrthographicCamera).isOrthographicCamera === true;
+    const dom = gl.domElement;
+    const aspect = (dom.clientWidth || 1) / (dom.clientHeight || 1);
 
     if (isOrtho) {
       const cam = camera as THREE.OrthographicCamera;
-      const dom = gl.domElement;
-      const aspect = (dom.clientWidth || 1) / (dom.clientHeight || 1);
       const half = (boardSize / 2) * 1.25;
       cam.zoom = 1;
       if (aspect >= 1) {
@@ -55,7 +57,14 @@ export function CameraController() {
     } else {
       const cam = camera as THREE.PerspectiveCamera;
       const fov = cam.fov || 45;
-      const dist = (boardSize / 2) / Math.sin((fov * Math.PI) / 360) * 1.25;
+      let dist = (boardSize / 2) / Math.sin((fov * Math.PI) / 360) * 1.25;
+      if (aspect < 1) {
+        // Portrait: the horizontal FOV is narrower, so also fit the board
+        // horizontally or the sides get clipped.
+        const half = (boardSize / 2) * 1.25;
+        const hDist = half / (Math.tan((fov * Math.PI) / 360) * aspect);
+        dist = Math.max(dist, hDist);
+      }
       cam.position.copy(dir).multiplyScalar(dist);
       cam.lookAt(0, 0, 0);
     }
@@ -64,7 +73,20 @@ export function CameraController() {
       controlsRef.current.target.set(0, 0, 0);
       controlsRef.current.update();
     }
-  }, [camera, gl, boardSize, resetViewTick, gamePhase]);
+  }, [camera, gl, boardSize]);
+
+  useEffect(() => {
+    fitToBoard();
+  }, [fitToBoard, resetViewTick, gamePhase]);
+
+  // Refit when the canvas element itself resizes (mobile panel open/close,
+  // orientation changes, window resizes).
+  useEffect(() => {
+    const el = gl.domElement;
+    const ro = new ResizeObserver(() => fitToBoard());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [gl, fitToBoard]);
 
   useEffect(() => {
     const controls = new OrbitControlsImpl(camera, gl.domElement);
