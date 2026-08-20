@@ -12,7 +12,7 @@ const HALO_START = 3.2;
 const END = 4.8;
 
 // Denser core: more particles per stone.
-const PARTICLES_PER_STONE = 36;
+const PARTICLES_PER_STONE = 120;
 // Short trails only while flying (avoids clutter once gathered).
 const TRAIL_LENGTH = 3;
 
@@ -103,7 +103,7 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
           end: centerVec.clone(),
           birth: (k / PARTICLES_PER_STONE) * 0.5 + Math.random() * 0.15,
           speed: 0.5 + Math.random() * 0.45,
-          size: 0.10 + Math.random() * 0.10,
+          size: 0.08 + Math.random() * 0.08,
           haloDir: hd,
           orbit: { angle: Math.random() * Math.PI * 2, speed: 1.5 + Math.random() * 2.5, radius: 0.06 + Math.random() * 0.1 },
           seed: Math.random() * Math.PI * 2,
