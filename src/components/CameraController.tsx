@@ -131,12 +131,13 @@ export function CameraController() {
       h.normalize();
       const v = new THREE.Vector3().crossVectors(dir, h).normalize();
 
-      // Orbit basis shared by the approach and orbit phases (zero-jump handoff).
-      const radial = h.clone().multiplyScalar(Math.cos(ORBIT_ANGLE))
-        .add(v.clone().multiplyScalar(Math.sin(ORBIT_ANGLE)));
-      const tangent = new THREE.Vector3().crossVectors(dir, radial).normalize();
-      const radius = lineLen * 0.6 + 3;
-      const orbitStart = mid.clone().add(radial.clone().multiplyScalar(radius));
+      // 45-degree cone orbit: camera stays on a cone whose axis is the winning
+      // line (view direction is 45° to the line), so the line's projection
+      // visibly rotates through the full 360°.
+      const coneDir = h.clone().multiplyScalar(Math.sin(ORBIT_ANGLE))
+        .add(dir.clone().multiplyScalar(Math.cos(ORBIT_ANGLE)));
+      const radius = Math.max(lineLen * 0.6 + 3, boardSize * 0.9);
+      const orbitStart = mid.clone().add(coneDir.clone().multiplyScalar(radius));
 
       if (controls) controls.enabled = false;
 
@@ -161,9 +162,8 @@ export function CameraController() {
         // Phase 3: 360°orbit from the 45°pose.
         const p = easeInOut(Math.min(1, (t - APPROACH_END) / ORBIT_DURATION));
         const angle = p * Math.PI * 2;
-        const pos = mid.clone()
-          .add(radial.clone().multiplyScalar(Math.cos(angle) * radius))
-          .add(tangent.clone().multiplyScalar(Math.sin(angle) * radius));
+        const q = new THREE.Quaternion().setFromAxisAngle(dir, angle);
+        const pos = mid.clone().add(coneDir.clone().applyQuaternion(q).multiplyScalar(radius));
         camera.position.copy(pos);
         camera.lookAt(mid);
       } else {
