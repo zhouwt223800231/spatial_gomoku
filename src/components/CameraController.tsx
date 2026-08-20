@@ -5,9 +5,9 @@ import * as THREE from 'three';
 import { useGameStore } from '../store/gameStore';
 
 const IGNITE_END = 1.8;      // phase 1: line grows / stones ignite (camera holds)
-const APPROACH_END = 3.0;    // phase 2: camera eases to the fixed 45闁硅櫣顢坥se
-const ORBIT_DURATION = 3.0;  // phase 3: 360闁硅櫣顢噐bit (ends at APPROACH_END + ORBIT_DURATION)
-const ORBIT_ANGLE = Math.PI / 4; // fixed 45闁硅櫣鐗玭clination to the winning line
+const APPROACH_END = 3.0;    // phase 2: camera eases to the fixed 45闂佺娅ｉ、鍧e
+const ORBIT_DURATION = 3.0;  // phase 3: 360闂佺娅ｉ、鍣恇it (ends at APPROACH_END + ORBIT_DURATION)
+const ORBIT_ANGLE = Math.PI / 4; // fixed 45闂佺娅ｉ悧鐜璫lination to the winning line
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 const easeInOutCubic = (t: number) =>
@@ -24,6 +24,7 @@ export function CameraController() {
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const phaseStartRef = useRef<number | null>(null);
   const approachStartPosRef = useRef<THREE.Vector3 | null>(null);
+  const approachStartQuatRef = useRef<THREE.Quaternion | null>(null);
   const orbitDoneRef = useRef(false);
 
   // Fit the whole board into view whenever size / view / overview changes.
@@ -130,7 +131,7 @@ export function CameraController() {
       h.normalize();
       const v = new THREE.Vector3().crossVectors(dir, h).normalize();
 
-      // Axial lines need the 45閹?cone so the rotation reads clearly; diagonal
+      // Axial lines need the 45闁?cone so the rotation reads clearly; diagonal
       // lines keep the classic plane orbit (better spatial feel).
       const isAxial =
         Math.abs(dir.x) > 0.999 || Math.abs(dir.y) > 0.999 || Math.abs(dir.z) > 0.999;
@@ -146,9 +147,10 @@ export function CameraController() {
 
       if (t < APPROACH_END) {
         // Smooth swing from the moment the last stone is placed: capture the
-        // current view at t=0 and arc to the orbit start (no freeze, no jump).
+        // current view (position + orientation) at t=0 and arc to the orbit start.
         if (approachStartPosRef.current === null) {
           approachStartPosRef.current = camera.position.clone();
+          approachStartQuatRef.current = camera.quaternion.clone();
         }
         const p = easeInOutCubic(t / APPROACH_END);
         const d0 = approachStartPosRef.current.clone().sub(mid).normalize();
@@ -160,9 +162,18 @@ export function CameraController() {
         const dirP = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
         const dist = THREE.MathUtils.lerp(dist0, radius, p);
         camera.position.copy(mid).addScaledVector(dirP, dist);
-        camera.lookAt(mid);
+        // Smoothly swing orientation from the user's last-stone view to
+        // looking at the line midpoint (no hard snap on the view direction).
+        if (approachStartQuatRef.current) {
+          const qTarget = new THREE.Quaternion().setFromRotationMatrix(
+            new THREE.Matrix4().lookAt(orbitStart, mid, up)
+          );
+          camera.quaternion.slerpQuaternions(approachStartQuatRef.current, qTarget, p);
+        } else {
+          camera.lookAt(mid);
+        }
       } else if (!orbitDoneRef.current && t <= APPROACH_END + ORBIT_DURATION) {
-        // Phase 3: 360闁硅櫣顢噐bit from the 45闁硅櫣顢坥se.
+        // Phase 3: 360闂佺娅ｉ、鍣恇it from the 45闂佺娅ｉ、鍧e.
         const p = easeInOut(Math.min(1, (t - APPROACH_END) / ORBIT_DURATION));
         const angle = p * Math.PI * 2;
         let pos;
