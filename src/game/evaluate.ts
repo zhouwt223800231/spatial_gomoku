@@ -1,6 +1,6 @@
 import { Position, Player, StoneData, BoardSize } from '../types';
 
-const DIRECTIONS: Position[] = [
+export const DIRECTIONS: Position[] = [
   { x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, { x: 0, y: 0, z: 1 },
   { x: 1, y: 1, z: 0 }, { x: 1, y: -1, z: 0 },
   { x: 1, y: 0, z: 1 }, { x: 1, y: 0, z: -1 },
@@ -24,6 +24,10 @@ export interface EvalWeights {
   DEFENSE: number;
   ATTACK: number;
   PATTERN_BREAK: number;
+  DOUBLE_THREAT: number;
+  THREAT_AXIS: number;
+  THREAT_Z: number;
+  THREAT_DIAG: number;
 }
 
 export const DEFAULT_WEIGHTS: EvalWeights = {
@@ -41,7 +45,81 @@ export const DEFAULT_WEIGHTS: EvalWeights = {
   DEFENSE: 1.0,
   ATTACK: 1.0,
   PATTERN_BREAK: 1.0,
+  DOUBLE_THREAT: 0,
+  THREAT_AXIS: 0,
+  THREAT_Z: 0,
+  THREAT_DIAG: 0,
 };
+
+const keyOf = (p: Position) => `${p.x},${p.y},${p.z}`;
+
+/**
+ * Number of open threats (open three / open four / four) that the given stone
+ * participates in, summed across the 13 directions, with direction categories.
+ */
+function stoneThreats(
+  pos: Position,
+  player: Player,
+  stoneMap: Map<string, Player>,
+  boardSize: BoardSize
+): { count: number; z: number; diag: number; axis: number } {
+  let count = 0;
+  let z = 0;
+  let diag = 0;
+  let axis = 0;
+
+  for (const dir of DIRECTIONS) {
+    // Count contiguous stones in both directions through this stone.
+    const forward: Position[] = [];
+    for (let i = 1; i < 5; i++) {
+      const p = { x: pos.x + dir.x * i, y: pos.y + dir.y * i, z: pos.z + dir.z * i };
+      if (p.x < 0 || p.x >= boardSize || p.y < 0 || p.y >= boardSize || p.z < 0 || p.z >= boardSize) break;
+      if (stoneMap.get(keyOf(p)) === player) forward.push(p);
+      else break;
+    }
+    const backward: Position[] = [];
+    for (let i = 1; i < 5; i++) {
+      const p = { x: pos.x - dir.x * i, y: pos.y - dir.y * i, z: pos.z - dir.z * i };
+      if (p.x < 0 || p.x >= boardSize || p.y < 0 || p.y >= boardSize || p.z < 0 || p.z >= boardSize) break;
+      if (stoneMap.get(keyOf(p)) === player) backward.push(p);
+      else break;
+    }
+    const line = [pos, ...forward, ...backward];
+    if (line.length < 3) continue;
+
+    // Open ends on this line.
+    const e1 = {
+      x: line[line.length - 1].x + dir.x,
+      y: line[line.length - 1].y + dir.y,
+      z: line[line.length - 1].z + dir.z,
+    };
+    const e2 = { x: line[0].x - dir.x, y: line[0].y - dir.y, z: line[0].z - dir.z };
+    const open = (p: Position) =>
+      p.x >= 0 && p.x < boardSize && p.y >= 0 && p.y < boardSize && p.z >= 0 && p.z < boardSize &&
+      !stoneMap.has(keyOf(p));
+    const openEnds = (open(e1) ? 1 : 0) + (open(e2) ? 1 : 0);
+
+    // Threat = open three (>=3, >=2 ends) or any four (>=4, >=1 end).
+    const isFour = line.length >= 4;
+    const isOpenThree = line.length === 3 && openEnds >= 2;
+    if (isFour && openEnds >= 1) {
+      count++;
+      if (dir.z !== 0) z++;
+      if (Math.abs(dir.x) + Math.abs(dir.y) + Math.abs(dir.z) === 3) diag++;
+      if (dir.x !== 0 && dir.y === 0 && dir.z === 0) axis++;
+      else if (dir.y !== 0 && dir.x === 0 && dir.z === 0) axis++;
+      else if (dir.z !== 0 && dir.x === 0 && dir.y === 0) axis++;
+    } else if (isOpenThree) {
+      count++;
+      if (dir.z !== 0) z++;
+      if (Math.abs(dir.x) + Math.abs(dir.y) + Math.abs(dir.z) === 3) diag++;
+      if (dir.x !== 0 && dir.y === 0 && dir.z === 0) axis++;
+      else if (dir.y !== 0 && dir.x === 0 && dir.z === 0) axis++;
+      else if (dir.z !== 0 && dir.x === 0 && dir.y === 0) axis++;
+    }
+  }
+  return { count, z, diag, axis };
+}
 
 export function evaluatePosition(
   stones: StoneData[],
@@ -51,11 +129,13 @@ export function evaluatePosition(
 ): number {
   const opponent: Player = player === 'black' ? 'white' : 'black';
   const stoneMap = new Map<string, Player>();
-  stones.forEach((s) => {
-    stoneMap.set(`${s.position.x},${s.position.y},${s.position.z}`, s.player);
-  });
+  stones.forEach((s) => stoneMap.set(keyOf(s.position), s.player));
 
   let score = 0;
+  let myThreats = 0;
+  let myThreatZ = 0;
+  let myThreatDiag = 0;
+  let myThreatAxis = 0;
 
   for (const stone of stones) {
     const isMine = stone.player === player;
@@ -85,10 +165,25 @@ export function evaluatePosition(
       score += sign * value;
     }
 
+    if (isMine) {
+      const t = stoneThreats(stone.position, player, stoneMap, boardSize);
+      myThreats += t.count;
+      myThreatZ += t.z;
+      myThreatDiag += t.diag;
+      myThreatAxis += t.axis;
+    }
+
     const center = (boardSize - 1) / 2;
     const dist = Math.abs(stone.position.x - center) + Math.abs(stone.position.y - center) + Math.abs(stone.position.z - center);
     score += sign * weights.CENTER * (3 * center - dist);
   }
+
+  // Double-threat bonus: multiple open threats (open three / four) in different
+  // directions, plus directional preferences (axis / Z / body diagonal).
+  score += weights.DOUBLE_THREAT * Math.max(0, myThreats - 1);
+  score += weights.THREAT_AXIS * myThreatAxis;
+  score += weights.THREAT_Z * myThreatZ;
+  score += weights.THREAT_DIAG * myThreatDiag;
 
   return score;
 }

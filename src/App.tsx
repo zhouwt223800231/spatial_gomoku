@@ -7,6 +7,7 @@ import { findBestMove, findBlockingMoves, findThreatEnds } from './game/ai';
 import { getAdaptiveWeights } from './game/adaptiveAI';
 import { loadAIExperience, updateAIExperience } from './game/aiExperience';
 import { recordGameOutcome, stonesToMoves } from './game/openingBook';
+import { computeThreatFeature, recordThreatFeature } from './game/threatLearning';
 import { runSelfPlayGame } from './game/selfPlay';
 import { usePlayerProfile } from './hooks/usePlayerProfile';
 import { useAudio } from './hooks/useAudio';
@@ -65,6 +66,7 @@ export default function App() {
   const aiPlayer: Player = humanPlayer === 'black' ? 'white' : 'black';
   const aiTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const aiBlocksRef = useRef(0);
+  const aiThreatFeaturesRef = useRef<{ feature: ReturnType<typeof computeThreatFeature> }[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const fineModeRef = useRef(false);
 
@@ -201,6 +203,8 @@ export default function App() {
           blocks: aiBlocksRef.current,
         });
         aiBlocksRef.current = 0;
+        for (const f of aiThreatFeaturesRef.current) recordThreatFeature(f.feature, aiWon);
+        aiThreatFeaturesRef.current = [];
         recordGameOutcome(stonesToMoves(stones), win.player);
       }
     } else if (isDraw(stones, boardSize)) {
@@ -215,6 +219,7 @@ export default function App() {
           blocks: aiBlocksRef.current,
         });
         aiBlocksRef.current = 0;
+        aiThreatFeaturesRef.current = [];
         recordGameOutcome(stonesToMoves(stones), null);
       }
     }
@@ -232,6 +237,7 @@ export default function App() {
         addAiInsight({ id: Date.now().toString(), type: 'adapted', message: insight, timestamp: Date.now() });
       }
       const result = findBestMove(stones, ai, boardSize, weights, maxDepth, blockWeight, nodeBudget, useBook);
+      aiThreatFeaturesRef.current.push({ feature: computeThreatFeature(stones, result.position, ai, boardSize) });
       const opp = ai === 'black' ? 'white' as Player : 'black' as Player;
       const threat3 = findThreatEnds(stones, opp, boardSize, 3);
       const threat4 = findThreatEnds(stones, opp, boardSize, 4);
@@ -275,6 +281,16 @@ export default function App() {
   }, [gamePhase]);
 
   useEffect(() => () => { cancelVictoryChime(); }, [cancelVictoryChime]);
+
+  // Post-game compensation training: after a finished AI game, run one light
+  // self-play game so the threat library keeps growing (rate-limited by phase change).
+  useEffect(() => {
+    if (gameMode !== 'ai' || (gamePhase !== 'won' && gamePhase !== 'draw')) return;
+    const id = window.setTimeout(() => {
+      runSelfPlayGame(useGameStore.getState().boardSize);
+    }, 400);
+    return () => clearTimeout(id);
+  }, [gamePhase, gameMode]);
 
   const winner = useGameStore.getState().winner;
   const dismissCelebration = () => {

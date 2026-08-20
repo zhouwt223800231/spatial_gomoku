@@ -3,6 +3,7 @@ import { getCandidatePositions } from './rules';
 import { evaluatePosition, EvalWeights, DEFAULT_WEIGHTS } from './evaluate';
 import { checkWin, DIRECTIONS } from './rules';
 import { getBookCandidates } from './openingBook';
+import { computeThreatFeature, queryThreatWinRate } from './threatLearning';
 
 export interface MoveResult {
   position: Position;
@@ -233,6 +234,21 @@ function pickBestBlocker(
     }
   }
   return best;
+}
+
+// Bonus from the threat-learning library: prefer moves whose created threat
+// pattern historically led to AI wins.
+function threatLearnBonus(
+  move: Position,
+  stones: StoneData[],
+  aiPlayer: Player,
+  boardSize: BoardSize,
+  weights: EvalWeights
+): number {
+  const feature = computeThreatFeature(stones, move, aiPlayer, boardSize);
+  const winRate = queryThreatWinRate(feature);
+  const learnWeight = weights.THREAT_AXIS > 0 || weights.DOUBLE_THREAT > 0 ? 8 : 2;
+  return winRate > 0 ? winRate * learnWeight * (1 + feature.openThreats) : 0;
 }
 
 // Heuristic ordering: favor center, proximity to stones, and blocking a three.

@@ -2,6 +2,7 @@ import { PlayerProfile, AiDifficulty } from '../types';
 import { EvalWeights, DEFAULT_WEIGHTS } from './evaluate';
 import type { AIExperience } from '../types';
 import { loadAIExperience, difficultyDepth, difficultyBlockWeight } from './aiExperience';
+import { loadThreatStats } from './threatLearning';
 
 export interface AdaptiveResult {
   weights: EvalWeights;
@@ -37,6 +38,25 @@ export function getAdaptiveWeights(
     blockWeight = 0;
     nodeBudget = 20_000;
     useBook = false;
+  }
+
+  // --- Threat-learning feedback: favor historically winning threat patterns ---
+  const threatStats = loadThreatStats();
+  const threatEntries = Object.values(threatStats);
+  const totalThreatPlays = threatEntries.reduce((s, e) => s + e.n, 0);
+  if (totalThreatPlays >= 6) {
+    const overallWinRate = threatEntries.reduce((s, e) => s + e.w, 0) / totalThreatPlays;
+    weights.DOUBLE_THREAT = Math.max(weights.DOUBLE_THREAT, 600);
+    weights.THREAT_AXIS = Math.max(weights.THREAT_AXIS, 40);
+    weights.THREAT_Z = Math.max(weights.THREAT_Z, 30);
+    weights.THREAT_DIAG = Math.max(weights.THREAT_DIAG, 25);
+    if (overallWinRate > 0.6) {
+      weights.DOUBLE_THREAT = Math.max(weights.DOUBLE_THREAT, 900);
+      if (!insight) insight = 'AI library: double-threat patterns have been winning - pressing harder';
+    }
+  } else if (difficulty === 'hard') {
+    weights.DOUBLE_THREAT = Math.max(weights.DOUBLE_THREAT, 400);
+    weights.THREAT_Z = Math.max(weights.THREAT_Z, 20);
   }
 
   // --- Experience / win-rate feedback (learning library) ---
