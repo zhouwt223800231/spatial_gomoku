@@ -51,6 +51,16 @@
     color: #a5f3fc;
     text-shadow: 0 0 10px rgba(103, 232, 249, 0.55), 0 0 24px rgba(103, 232, 249, 0.25);
   }
+
+  /* Mobile: fewer heavy backdrop blurs keep the 3D board smooth. */
+  @media (max-width: 767px) {
+    .glass-panel {
+      @apply backdrop-blur-md;
+    }
+    .glass-button {
+      @apply backdrop-blur-sm;
+    }
+  }
 }
 
 @keyframes victory-title {

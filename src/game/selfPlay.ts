@@ -13,7 +13,7 @@ export interface SelfPlayResult {
  * Run one lightweight self-play game (AI vs AI) and feed the winning move
  * sequence into the opening book + threat learning library.
  */
-export function runSelfPlayGame(boardSize: BoardSize = 5): SelfPlayResult {
+export async function runSelfPlayGame(boardSize: BoardSize = 5): Promise<SelfPlayResult> {
   let stones: StoneData[] = [];
   let current: Player = 'black';
   const moves: Position[] = [];
@@ -21,6 +21,8 @@ export function runSelfPlayGame(boardSize: BoardSize = 5): SelfPlayResult {
   const features: { player: Player; feature: ReturnType<typeof computeThreatFeature> }[] = [];
 
   for (let step = 0; step < boardSize * boardSize * boardSize; step++) {
+    // Yield to the event loop so long self-play runs don't block the UI.
+    if (step % 2 === 0) await new Promise((r) => setTimeout(r, 0));
     const weights = { ...DEFAULT_WEIGHTS, DEFENSE: 1.2, ATTACK: 1.2 };
     const result = findBestMove(stones, current, boardSize, weights, 2, 0.6, 6_000, false);
     const feature = computeThreatFeature(stones, result.position, current, boardSize);
@@ -33,8 +35,7 @@ export function runSelfPlayGame(boardSize: BoardSize = 5): SelfPlayResult {
       recordGameOutcome(moves, win.player);
       // Reward each feature based on whether its player won (black perspective = aiWon for black).
       for (const f of features) {
-        const won = f.player === win.player;
-        recordThreatFeature(f.feature, won);
+        recordThreatFeature(f.feature, f.player, win.player);
       }
       return { winner: win.player };
     }

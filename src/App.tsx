@@ -203,7 +203,7 @@ export default function App() {
           blocks: aiBlocksRef.current,
         });
         aiBlocksRef.current = 0;
-        for (const f of aiThreatFeaturesRef.current) recordThreatFeature(f.feature, aiWon);
+        for (const f of aiThreatFeaturesRef.current) recordThreatFeature(f.feature, ai, win.player);
         aiThreatFeaturesRef.current = [];
         recordGameOutcome(stonesToMoves(stones), win.player);
       }
@@ -268,7 +268,7 @@ export default function App() {
       if (cancelled || runs >= 2) return;
       const deadline = (performance.now() + 60);
       while (performance.now() < deadline && runs < 2) {
-        runSelfPlayGame(useGameStore.getState().boardSize);
+        void runSelfPlayGame(useGameStore.getState().boardSize);
         runs += 1;
       }
       if (runs < 2) requestIdleCallback(tick, { timeout: 4000 });
@@ -287,7 +287,7 @@ export default function App() {
   useEffect(() => {
     if (gameMode !== 'ai' || (gamePhase !== 'won' && gamePhase !== 'draw')) return;
     const id = window.setTimeout(() => {
-      runSelfPlayGame(useGameStore.getState().boardSize);
+      void runSelfPlayGame(useGameStore.getState().boardSize);
     }, 400);
     return () => clearTimeout(id);
   }, [gamePhase, gameMode]);
@@ -299,7 +299,7 @@ export default function App() {
   };
 
   return (
-    <div className="w-screen h-screen relative space-bg" onContextMenu={(e) => e.preventDefault()}>
+    <div className="w-screen relative space-bg" style={{ height: "100dvh" }} onContextMenu={(e) => e.preventDefault()}>
       <Canvas
         key={viewMode}
         orthographic={viewMode === 'orthographic'}

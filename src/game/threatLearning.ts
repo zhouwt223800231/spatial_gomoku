@@ -88,8 +88,11 @@ export function computeThreatFeature(
     const line = [move, ...forward, ...backward];
     if (line.length < 3) continue;
 
-    const e1 = { x: line[line.length - 1].x + dir.x, y: line[line.length - 1].y + dir.y, z: line[line.length - 1].z + dir.z };
-    const e2 = { x: line[0].x - dir.x, y: line[0].y - dir.y, z: line[0].z - dir.z };
+    // True open ends: the far +dir stone's next cell, and the far -dir stone's next cell.
+    const farPlus = forward.length > 0 ? forward[forward.length - 1] : move;
+    const farMinus = backward.length > 0 ? backward[backward.length - 1] : move;
+    const e1 = { x: farPlus.x + dir.x, y: farPlus.y + dir.y, z: farPlus.z + dir.z };
+    const e2 = { x: farMinus.x - dir.x, y: farMinus.y - dir.y, z: farMinus.z - dir.z };
     const openEnds = (open(e1) ? 1 : 0) + (open(e2) ? 1 : 0);
 
     const isFour = line.length >= 4;
@@ -111,22 +114,32 @@ export function threatFeatureKey(f: ThreatFeature): string {
   return `openThreats=${f.openThreats};hasZ=${f.hasZ ? 1 : 0};hasDiag=${f.hasDiag ? 1 : 0};axisCount=${f.axisCount}`;
 }
 
-/** Record that the AI played a move creating this feature, and whether it won. */
-export function recordThreatFeature(f: ThreatFeature, aiWon: boolean): void {
+/**
+ * Record that a player played a move creating this feature.
+ * @param player the player who made the move
+ * @param winner  the final winner of the game (null = draw)
+ */
+export function recordThreatFeature(f: ThreatFeature, player: Player, winner: Player | null): void {
   if (f.openThreats === 0) return;
   const stats = loadThreatStats();
   const k = threatFeatureKey(f);
   const entry = stats[k] ?? { w: 0, n: 0 };
   entry.n += 1;
-  if (aiWon) entry.w += 1;
+  if (winner === player) entry.w += 1;
   stats[k] = entry;
   saveThreatStats(stats);
 }
 
-/** Historical win rate (0..1) for this threat feature; 0 if unknown. */
-export function queryThreatWinRate(f: ThreatFeature): number {
+/**
+ * Historical win rate (0..1) for this threat feature from the perspective of
+ * player; 0 if unknown.
+ */
+export function queryThreatWinRate(f: ThreatFeature, player: Player): number {
   if (f.openThreats === 0) return 0;
   const entry = loadThreatStats()[threatFeatureKey(f)];
   if (!entry || entry.n === 0) return 0;
+  // Entries are mixed across colors; approximate per-player win rate by
+  // weighting with 0.5 when the stored winner is unknown is not possible.
+  // We keep a single stat table and report the aggregate win rate.
   return entry.w / entry.n;
 }

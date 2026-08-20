@@ -246,7 +246,7 @@ function threatLearnBonus(
   weights: EvalWeights
 ): number {
   const feature = computeThreatFeature(stones, move, aiPlayer, boardSize);
-  const winRate = queryThreatWinRate(feature);
+  const winRate = queryThreatWinRate(feature, aiPlayer);
   const learnWeight = weights.THREAT_AXIS > 0 || weights.DOUBLE_THREAT > 0 ? 8 : 2;
   return winRate > 0 ? winRate * learnWeight * (1 + feature.openThreats) : 0;
 }
