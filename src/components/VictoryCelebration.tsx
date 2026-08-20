@@ -4,11 +4,13 @@ import * as THREE from 'three';
 
 // Timeline (seconds):
 // 0-1.8 line grows (center -> both ends) while stones ignite sequentially
-// (0.3s apart) -> ~2.2 all lit, gentle breathing -> camera orbit (3.0-6.0).
+// (0.3s apart -> all 5 lit by 1.2s) -> gentle breathing until orbit (~2.2s+).
 const IGNITE_END = 1.8;
 const IGNITE_STEP = 0.3;
-const GLOW_RISE = 1.8;      // emissive intensity target
-const GLOW_BREATHE = 0.25;  // gentle breathing amplitude
+const GLOW_RISE = 1.5;      // white-hot emissive intensity
+const GLOW_BREATHE = 0.3;   // gentle breathing amplitude
+const RING_RADIUS = 0.55;
+const RING_TUBE = 0.02;
 
 interface VictoryCelebrationProps {
   positions: [number, number, number][];
@@ -16,11 +18,12 @@ interface VictoryCelebrationProps {
 }
 
 export function VictoryCelebration({ positions, player }: VictoryCelebrationProps) {
-  const color = player === 'black' ? '#fbbf24' : '#60a5fa';
-  const glow = player === 'black' ? '#f59e0b' : '#3b82f6';
+  const color = player === 'black' ? '#fbbf24' : '#60a5fa'; // accent color for rings/line
+  const whiteHot = '#ffffff';                                 // stones glow white-hot, keep their own color
 
   const startRef = useRef<number | null>(null);
   const stonesRef = useRef<(THREE.Mesh | null)[]>([]);
+  const ringRefs = useRef<(THREE.Mesh | null)[]>([]);
   const segsRef = useRef<(THREE.Line | null)[]>([]);
 
   const n = positions.length;
@@ -60,24 +63,38 @@ export function VictoryCelebration({ positions, player }: VictoryCelebrationProp
       mat.opacity = 0.35 * reveal(progress, dist);
     });
 
-    // Stones ignite sequentially (first -> last), then gently breathe.
+    // Stones ignite sequentially (first -> last, ALL five), then breathe.
     stonesRef.current.forEach((mesh, i) => {
       if (!mesh) return;
-      const igniteAt = i * IGNITE_STEP / (IGNITE_END - IGNITE_STEP * (n - 1));
+      // igniteAt = i*step / IGNITE_END keeps i=4 well below 1 so every stone lights.
+      const igniteAt = (i * IGNITE_STEP) / IGNITE_END;
       const local = (progress - igniteAt) / 0.22;
       const mat = mesh.material as THREE.MeshStandardMaterial;
       if (local <= 0) {
         mesh.scale.setScalar(0.45);
         mat.emissiveIntensity = 0.25;
       } else if (local < 1) {
-        // Pop: scale up with a bounce, glow ramps to bright.
         const s = 0.45 + 0.25 * (1 - Math.pow(1 - local, 3));
         mesh.scale.setScalar(s);
         mat.emissiveIntensity = 0.25 + (GLOW_RISE - 0.25) * local;
       } else {
-        // All lit: gentle breathing, slight shimmer.
         mesh.scale.setScalar(0.7 - 0.04 * Math.sin(t * 2 + i * 0.7));
         mat.emissiveIntensity = GLOW_RISE + GLOW_BREATHE * Math.sin(t * 2.2 + i * 0.9);
+      }
+    });
+
+    // Accent rings pulse with the glow.
+    ringRefs.current.forEach((ring, i) => {
+      if (!ring) return;
+      const rm = ring.material as THREE.MeshBasicMaterial;
+      const lit = progress >= (i * IGNITE_STEP) / IGNITE_END;
+      if (lit) {
+        const breathe = 0.5 + 0.15 * Math.sin(t * 2.2 + i * 0.9);
+        ring.scale.setScalar(1 + 0.04 * Math.sin(t * 2 + i));
+        rm.opacity = breathe;
+        ring.visible = true;
+      } else {
+        ring.visible = false;
       }
     });
   });
@@ -89,25 +106,36 @@ export function VictoryCelebration({ positions, player }: VictoryCelebrationProp
       ))}
 
       {positions.map((p, i) => (
-        <mesh
-          key={i}
-          position={p}
-          raycast={() => null}
-          ref={(el) => { stonesRef.current[i] = el; }}
-        >
-          <sphereGeometry args={[0.45, 16, 16]} />
-          <meshStandardMaterial
-            color={color}
-            emissive={glow}
-            emissiveIntensity={0.25}
-            roughness={0.3}
-            metalness={0.1}
-            transparent
-            opacity={0.95}
-            depthTest={false}
-            depthWrite={false}
-          />
-        </mesh>
+        <group key={i} position={p}>
+          {/* Stone: keeps its own color; glow is white-hot. */}
+          <mesh
+            raycast={() => null}
+            ref={(el) => { stonesRef.current[i] = el; }}
+          >
+            <sphereGeometry args={[0.45, 16, 16]} />
+            <meshStandardMaterial
+              color={player === 'black' ? '#1e293b' : '#f5f5f0'}
+              emissive={whiteHot}
+              emissiveIntensity={0.25}
+              roughness={0.3}
+              metalness={0.1}
+              transparent
+              opacity={0.95}
+              depthTest={false}
+              depthWrite={false}
+            />
+          </mesh>
+
+          {/* Victory-color accent ring (keeps the win color as a subtle halo). */}
+          <mesh
+            visible={false}
+            ref={(el) => { ringRefs.current[i] = el; }}
+            raycast={() => null}
+          >
+            <torusGeometry args={[RING_RADIUS, RING_TUBE, 8, 40]} />
+            <meshBasicMaterial color={color} transparent opacity={0.5} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} />
+          </mesh>
+        </group>
       ))}
     </group>
   );

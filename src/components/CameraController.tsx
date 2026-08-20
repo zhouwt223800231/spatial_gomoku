@@ -6,9 +6,9 @@ import { useGameStore } from '../store/gameStore';
 
 const FREEZE_END = 1.2;      // phase 0: freeze & slow push-in
 const IGNITE_END = 1.8;      // phase 1: line grows / stones ignite (camera holds)
-const APPROACH_END = 3.0;    // phase 2: camera eases to the fixed 45鎺硃ose
-const ORBIT_DURATION = 3.0;  // phase 3: 360鎺硂rbit (ends at APPROACH_END + ORBIT_DURATION)
-const ORBIT_ANGLE = Math.PI / 4; // fixed 45鎺砳nclination to the winning line
+const APPROACH_END = 3.0;    // phase 2: camera eases to the fixed 45閹虹ose
+const ORBIT_DURATION = 3.0;  // phase 3: 360閹虹rbit (ends at APPROACH_END + ORBIT_DURATION)
+const ORBIT_ANGLE = Math.PI / 4; // fixed 45閹虹牫nclination to the winning line
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 const easeInOutCubic = (t: number) =>
@@ -131,7 +131,7 @@ export function CameraController() {
       h.normalize();
       const v = new THREE.Vector3().crossVectors(dir, h).normalize();
 
-      // Axial lines need the 45掳 cone so the rotation reads clearly; diagonal
+      // Axial lines need the 45鎺?cone so the rotation reads clearly; diagonal
       // lines keep the classic plane orbit (better spatial feel).
       const isAxial =
         Math.abs(dir.x) > 0.999 || Math.abs(dir.y) > 0.999 || Math.abs(dir.z) > 0.999;
@@ -155,15 +155,23 @@ export function CameraController() {
         camera.position.copy(target);
         camera.lookAt(mid);
       } else if (t < APPROACH_END) {
-        // Phase 1 (hold, watch the line grow) + Phase 2 (ease to the 45鎺硃ose).
+        // Phase 1 (hold, watch the line grow) + Phase 2 (ease to the 45閹虹ose).
         if (approachStartPosRef.current === null) {
           approachStartPosRef.current = camera.position.clone();
         }
         const p = easeInOutCubic(Math.max(0, Math.min(1, (t - IGNITE_END) / (APPROACH_END - IGNITE_END))));
-        camera.position.lerpVectors(approachStartPosRef.current, orbitStart, p);
+        const d0 = approachStartPosRef.current.clone().sub(mid).normalize();
+        const d1 = orbitStart.clone().sub(mid).normalize();
+        const dist0 = approachStartPosRef.current.distanceTo(mid);
+        const q0 = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), d0);
+        const q1 = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), d1);
+        const q = q0.clone().slerp(q1, p);
+        const dirP = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+        const dist = THREE.MathUtils.lerp(dist0, radius, p);
+        camera.position.copy(mid).addScaledVector(dirP, dist);
         camera.lookAt(mid);
       } else if (!orbitDoneRef.current && t <= APPROACH_END + ORBIT_DURATION) {
-        // Phase 3: 360鎺硂rbit from the 45鎺硃ose.
+        // Phase 3: 360閹虹rbit from the 45閹虹ose.
         const p = easeInOut(Math.min(1, (t - APPROACH_END) / ORBIT_DURATION));
         const angle = p * Math.PI * 2;
         let pos;
