@@ -9,11 +9,11 @@ interface StarfieldProps {
   animate?: boolean;
 }
 
-// Fraction of the fixed far-star pool revealed per board size (5/7/9).
-const VISIBLE_BY_SIZE: Record<number, number> = { 5: 0.42, 7: 0.68, 9: 1.0 };
+// Fixed reveal fraction of the far-star pool (the "5x3 density" look).
+const VISIBLE = 0.42;
 const DUST_COUNT = 60;
-const DIM_MENU = 1.0; // brightness in the main menu
-const DIM_GAME = 0.55; // dimmer + static during gameplay (less distraction)
+const DIM_MENU = 1.0; // full brightness in the main menu
+const FADE_LAMBDA = 0.8; // slow fade in/out between menu and game (~3s)
 
 const FAR_VERT = `
 attribute float aReveal;
@@ -46,25 +46,20 @@ void main() {
 
 /**
  * Starfield behind the main menu and during games.
- * - Menu: slow drift + gentle twinkle (animate = true).
- * - Game: fully static and dimmed (animate = false).
- * - The number of visible stars follows the board size (5/7/9) and fades in/out
- *   smoothly via a per-star reveal threshold; coordinates and rotation phase
- *   never regenerate, so switching board size never resets the animation.
+ * - Main menu: slow drift + gentle twinkle at a fixed "5x3 density" count.
+ * - Board interface: the stars slowly fade out to invisible (uBrightness -> 0),
+ *   then drift back in when returning to the menu.
+ * - Coordinates and rotation phase are generated once and never reset.
  */
 export function Starfield({ maxCount = 1750, radius = 30, animate: animateProp }: StarfieldProps) {
   const gl = useThree((s) => s.gl);
   const gamePhase = useGameStore((s) => s.gamePhase);
-  const boardSize = useGameStore((s) => s.boardSize);
   const animate = animateProp ?? (gamePhase === 'menu');
 
   const bgGroup = useRef<THREE.Group>(null);
   const fgGroup = useRef<THREE.Group>(null);
   const matRef = useRef<THREE.ShaderMaterial>(null);
   const fgMatRef = useRef<THREE.PointsMaterial>(null);
-
-  const targetVisible = VISIBLE_BY_SIZE[boardSize] ?? 0.42;
-  const visibleRef = useRef(targetVisible);
 
   const farData = useMemo(() => {
     const pos = new Float32Array(maxCount * 3);
@@ -97,33 +92,29 @@ export function Starfield({ maxCount = 1750, radius = 30, animate: animateProp }
   // Stable uniform object (never recreated) so the shader keeps its state.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const uniforms = useMemo(() => ({
-    uVisible: { value: visibleRef.current },
+    uVisible: { value: VISIBLE },
     uSize: { value: 0.24 },
     uScale: { value: 300 },
     uTime: { value: 0 },
     uTwinkle: { value: animate ? 1 : 0 },
-    uBrightness: { value: animate ? DIM_MENU : DIM_GAME },
+    uBrightness: { value: animate ? DIM_MENU : 0 },
   }), []);
 
   useFrame((state, delta) => {
-    // Always drive the reveal threshold toward the current board size (stable
-    // in-game; smoothly fades in/out when the player changes board size).
-    const target = VISIBLE_BY_SIZE[boardSize] ?? 0.42;
-    visibleRef.current = THREE.MathUtils.damp(visibleRef.current, target, 1.2, delta);
-
     if (matRef.current) {
       const u = matRef.current.uniforms;
-      u.uVisible.value = visibleRef.current;
+      u.uVisible.value = VISIBLE; // fixed 5x3 density (no longer follows board size)
       u.uTime.value = state.clock.elapsedTime;
       u.uScale.value = (gl.domElement.height || 600) * 0.5;
       u.uTwinkle.value = animate ? 1 : 0;
-      u.uBrightness.value = THREE.MathUtils.damp(u.uBrightness.value, animate ? DIM_MENU : DIM_GAME, 3, delta);
+      // Slowly fade out in the board interface, back in on the menu.
+      u.uBrightness.value = THREE.MathUtils.damp(u.uBrightness.value, animate ? DIM_MENU : 0, FADE_LAMBDA, delta);
     }
     if (fgMatRef.current) {
-      fgMatRef.current.opacity = THREE.MathUtils.damp(fgMatRef.current.opacity, animate ? 0.5 : 0.28, 3, delta);
+      fgMatRef.current.opacity = THREE.MathUtils.damp(fgMatRef.current.opacity, animate ? 0.5 : 0, FADE_LAMBDA, delta);
     }
 
-    // Drift only in the menu; during a game the background stays static.
+    // Drift only in the menu.
     if (animate) {
       if (bgGroup.current) {
         bgGroup.current.rotation.y += delta * 0.02;
