@@ -13,7 +13,7 @@ interface StarfieldProps {
 const VISIBLE = 0.42;
 const DUST_COUNT = 60;
 const DIM_MENU = 1.0; // full brightness in the main menu
-const FADE_LAMBDA = 0.8; // slow fade in/out between menu and game (~3s)
+const FADE_LAMBDA = 3.0; // fade in/out within ~1s
 
 const FAR_VERT = `
 attribute float aReveal;
@@ -46,9 +46,10 @@ void main() {
 
 /**
  * Starfield behind the main menu and during games.
- * - Main menu: slow drift + gentle twinkle at a fixed "5x3 density" count.
- * - Board interface: the stars slowly fade out to invisible (uBrightness -> 0),
- *   then drift back in when returning to the menu.
+ * - Main menu: slow drift + gentle twinkle at a fixed "5x3 density" count,
+ *   unaffected by board size; the animation runs continuously.
+ * - Board interface: the same dynamic animation keeps playing while the stars
+ *   fade out to invisible within ~1s, then drift back in on the menu.
  * - Coordinates and rotation phase are generated once and never reset.
  */
 export function Starfield({ maxCount = 1750, radius = 30, animate: animateProp }: StarfieldProps) {
@@ -96,7 +97,7 @@ export function Starfield({ maxCount = 1750, radius = 30, animate: animateProp }
     uSize: { value: 0.24 },
     uScale: { value: 300 },
     uTime: { value: 0 },
-    uTwinkle: { value: animate ? 1 : 0 },
+    uTwinkle: { value: 1 },
     uBrightness: { value: animate ? DIM_MENU : 0 },
   }), []);
 
@@ -106,7 +107,7 @@ export function Starfield({ maxCount = 1750, radius = 30, animate: animateProp }
       u.uVisible.value = VISIBLE; // fixed 5x3 density (no longer follows board size)
       u.uTime.value = state.clock.elapsedTime;
       u.uScale.value = (gl.domElement.height || 600) * 0.5;
-      u.uTwinkle.value = animate ? 1 : 0;
+      u.uTwinkle.value = 1; // keep the dynamic twinkle everywhere
       // Slowly fade out in the board interface, back in on the menu.
       u.uBrightness.value = THREE.MathUtils.damp(u.uBrightness.value, animate ? DIM_MENU : 0, FADE_LAMBDA, delta);
     }
@@ -114,16 +115,14 @@ export function Starfield({ maxCount = 1750, radius = 30, animate: animateProp }
       fgMatRef.current.opacity = THREE.MathUtils.damp(fgMatRef.current.opacity, animate ? 0.5 : 0, FADE_LAMBDA, delta);
     }
 
-    // Drift only in the menu.
-    if (animate) {
-      if (bgGroup.current) {
-        bgGroup.current.rotation.y += delta * 0.02;
-        bgGroup.current.rotation.x += delta * 0.005;
-      }
-      if (fgGroup.current) {
-        fgGroup.current.rotation.y += delta * 0.06;
-        fgGroup.current.rotation.z += delta * 0.012;
-      }
+    // The starfield keeps drifting (menu and in-game during the fade-out).
+    if (bgGroup.current) {
+      bgGroup.current.rotation.y += delta * 0.02;
+      bgGroup.current.rotation.x += delta * 0.005;
+    }
+    if (fgGroup.current) {
+      fgGroup.current.rotation.y += delta * 0.06;
+      fgGroup.current.rotation.z += delta * 0.012;
     }
   });
 

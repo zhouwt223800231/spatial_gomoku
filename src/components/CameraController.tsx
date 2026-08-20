@@ -32,6 +32,9 @@ export function CameraController() {
   // the board band shrinks so the board is never covered).
   const fitToBoard = useCallback(() => {
     const dir = new THREE.Vector3(1, 1, 1).normalize();
+    // In the menu there is no board to frame; keep the camera fixed so
+    // the starfield backdrop stays stable when changing board size.
+    if (gamePhase === 'menu') return;
     const isOrtho = (camera as THREE.OrthographicCamera).isOrthographicCamera === true;
     const dom = gl.domElement;
     const aspect = (dom.clientWidth || 1) / (dom.clientHeight || 1);
@@ -73,7 +76,7 @@ export function CameraController() {
       controlsRef.current.target.set(0, 0, 0);
       controlsRef.current.update();
     }
-  }, [camera, gl, boardSize]);
+  }, [camera, gl, boardSize, gamePhase]);
 
   useEffect(() => {
     fitToBoard();
