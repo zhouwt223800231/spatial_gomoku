@@ -45,10 +45,10 @@ export const DEFAULT_WEIGHTS: EvalWeights = {
   DEFENSE: 1.0,
   ATTACK: 1.0,
   PATTERN_BREAK: 1.0,
-  DOUBLE_THREAT: 0,
-  THREAT_AXIS: 0,
-  THREAT_Z: 0,
-  THREAT_DIAG: 0,
+  DOUBLE_THREAT: 300,
+  THREAT_AXIS: 18,
+  THREAT_Z: 14,
+  THREAT_DIAG: 12,
 };
 
 const keyOf = (p: Position, size: number) => (p.x * size + p.y) * size + p.z;

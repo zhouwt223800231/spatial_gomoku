@@ -79,7 +79,7 @@ export default function App() {
     if (occupied) return;
     st.placeStone(pos);
     playPlaceSound(pos, st.boardSize);
-    recordMove(pos, [...st.stones, { position: pos, player: st.currentPlayer }], st.boardSize);
+    recordMove(st.currentPlayer, pos, [...st.stones, { position: pos, player: st.currentPlayer }], st.boardSize);
     st.setGhostPosition(null);
     st.setSliceAxis('z');
     fineModeRef.current = false;
@@ -292,7 +292,7 @@ export default function App() {
     return () => clearTimeout(id);
   }, [gamePhase, gameMode]);
 
-  const winner = useGameStore.getState().winner;
+  const winner = useGameStore((s) => s.winner);
   const dismissCelebration = () => {
     useGameStore.getState().setCelebrationDismissed(true);
     useGameStore.getState().setReviewMode(true);
@@ -302,7 +302,6 @@ export default function App() {
     <div className="w-screen relative space-bg" style={{ height: "100dvh" }} onContextMenu={(e) => e.preventDefault()}>
       <Canvas
         dpr={[1, 2]}
-        key={viewMode}
         orthographic={viewMode === 'orthographic'}
         camera={viewMode === 'orthographic'
           ? { position: [6, 6, 6], zoom: 1, near: -100, far: 100, left: -1, right: 1, top: 1, bottom: -1 }

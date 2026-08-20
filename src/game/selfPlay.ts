@@ -23,8 +23,9 @@ export async function runSelfPlayGame(boardSize: BoardSize = 5): Promise<SelfPla
   for (let step = 0; step < boardSize * boardSize * boardSize; step++) {
     // Yield to the event loop so long self-play runs don't block the UI.
     if (step % 2 === 0) await new Promise((r) => setTimeout(r, 0));
+    // Stronger self-play so the AI does not teach itself with weak depth-2 play.
     const weights = { ...DEFAULT_WEIGHTS, DEFENSE: 1.2, ATTACK: 1.2 };
-    const result = findBestMove(stones, current, boardSize, weights, 2, 0.6, 6_000, false);
+    const result = findBestMove(stones, current, boardSize, weights, 3, 0.8, 20_000, false);
     const feature = computeThreatFeature(stones, result.position, current, boardSize);
     features.push({ player: current, feature });
     stones = [...stones, { position: result.position, player: current }];

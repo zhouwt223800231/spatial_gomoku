@@ -1,13 +1,13 @@
 import { useState, useCallback } from 'react';
-import { PlayerProfile, Position, StoneData, BoardSize } from '../types';
+import { PlayerProfile, Player, Position, StoneData, BoardSize } from '../types';
 import { loadProfile, saveProfile, updateProfileAfterMove, updateProfileAfterGame, createDefaultProfile } from '../game/playerProfile';
 
 export function usePlayerProfile() {
   const [profile, setProfile] = useState<PlayerProfile>(loadProfile);
 
-  const recordMove = useCallback((position: Position, stones: StoneData[], boardSize: BoardSize) => {
+  const recordMove = useCallback((player: Player, position: Position, stones: StoneData[], boardSize: BoardSize) => {
     setProfile((prev) => {
-      const updated = updateProfileAfterMove(prev, position, stones, boardSize);
+      const updated = updateProfileAfterMove(prev, player, position, stones, boardSize);
       saveProfile(updated);
       return updated;
     });

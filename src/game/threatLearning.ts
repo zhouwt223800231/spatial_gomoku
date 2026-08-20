@@ -110,8 +110,8 @@ export function computeThreatFeature(
   return { openThreats, hasZ, hasDiag, axisCount };
 }
 
-export function threatFeatureKey(f: ThreatFeature): string {
-  return `openThreats=${f.openThreats};hasZ=${f.hasZ ? 1 : 0};hasDiag=${f.hasDiag ? 1 : 0};axisCount=${f.axisCount}`;
+export function threatFeatureKey(f: ThreatFeature, player: Player): string {
+  return `${player}|openThreats=${f.openThreats};hasZ=${f.hasZ ? 1 : 0};hasDiag=${f.hasDiag ? 1 : 0};axisCount=${f.axisCount}`;
 }
 
 /**
@@ -119,13 +119,16 @@ export function threatFeatureKey(f: ThreatFeature): string {
  * @param player the player who made the move
  * @param winner  the final winner of the game (null = draw)
  */
+const MAX_SAMPLES = 100;
+
 export function recordThreatFeature(f: ThreatFeature, player: Player, winner: Player | null): void {
   if (f.openThreats === 0) return;
   const stats = loadThreatStats();
-  const k = threatFeatureKey(f);
+  const k = threatFeatureKey(f, player);
   const entry = stats[k] ?? { w: 0, n: 0 };
-  entry.n += 1;
-  if (winner === player) entry.w += 1;
+  // Cap n so a single session cannot dominate the win rate.
+  if (entry.n < MAX_SAMPLES) entry.n += 1;
+  if (winner === player && entry.n > 0) entry.w += 1;
   stats[k] = entry;
   saveThreatStats(stats);
 }
@@ -136,10 +139,11 @@ export function recordThreatFeature(f: ThreatFeature, player: Player, winner: Pl
  */
 export function queryThreatWinRate(f: ThreatFeature, player: Player): number {
   if (f.openThreats === 0) return 0;
-  const entry = loadThreatStats()[threatFeatureKey(f)];
+  const entry = loadThreatStats()[threatFeatureKey(f, player)];
   if (!entry || entry.n === 0) return 0;
   // Entries are mixed across colors; approximate per-player win rate by
   // weighting with 0.5 when the stored winner is unknown is not possible.
   // We keep a single stat table and report the aggregate win rate.
   return entry.w / entry.n;
 }
+

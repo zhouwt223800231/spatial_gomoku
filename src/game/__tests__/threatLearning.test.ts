@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { computeThreatFeature, threatFeatureKey, recordThreatFeature, queryThreatWinRate, loadThreatStats } from '../threatLearning';
 import { Position, StoneData, Player } from '../../types';
 
@@ -18,15 +18,15 @@ beforeEach(() => {
 });
 
 describe('threatLearning', () => {
-  it('feature key is stable and coarse-grained', () => {
+  it('feature key is stable, coarse-grained and color-scoped', () => {
     // Open three: cells (1,0,0)(2,0,0) then placing at (3,0,0) creates
     // a 3-in-a-row with both ends (0,0,0) and (4,0,0) open.
     const stones = [st(pos(1, 0, 0), 'white'), st(pos(2, 0, 0), 'white')];
     const f = computeThreatFeature(stones, pos(3, 0, 0), 'white', 5);
     expect(f.openThreats).toBeGreaterThanOrEqual(1);
-    const k = threatFeatureKey(f);
-    expect(k).toMatch(/^openThreats=\d+;hasZ=[01];hasDiag=[01];axisCount=\d+$/);
-    expect(threatFeatureKey(f)).toBe(k);
+    const k = threatFeatureKey(f, 'white');
+    expect(k).toMatch(/^white\|openThreats=\d+;hasZ=[01];hasDiag=[01];axisCount=\d+$/);
+    expect(threatFeatureKey(f, 'white')).toBe(k);
   });
 
   it('record/query win rate is color-aware', () => {
@@ -40,5 +40,21 @@ describe('threatLearning', () => {
     expect(rate).toBeGreaterThan(0);
     expect(rate).toBeLessThanOrEqual(1);
     expect(Object.keys(loadThreatStats()).length).toBeGreaterThan(0);
+  });
+
+  it('black and white stats never pollute each other', () => {
+    const ctx = [st(pos(1, 0, 0), 'white'), st(pos(2, 0, 0), 'white')];
+    const f = computeThreatFeature(ctx, pos(3, 0, 0), 'white', 5);
+
+    // Black always wins with this feature; white always loses with it.
+    for (let i = 0; i < 5; i++) {
+      recordThreatFeature(f, 'black', 'black');
+      recordThreatFeature(f, 'white', 'black');
+    }
+
+    expect(queryThreatWinRate(f, 'black')).toBe(1);
+    expect(queryThreatWinRate(f, 'white')).toBe(0);
+    // Keys are distinct per color.
+    expect(threatFeatureKey(f, 'black')).not.toBe(threatFeatureKey(f, 'white'));
   });
 });

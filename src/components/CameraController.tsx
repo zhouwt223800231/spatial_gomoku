@@ -5,9 +5,9 @@ import * as THREE from 'three';
 import { useGameStore } from '../store/gameStore';
 
 const IGNITE_END = 1.8;      // phase 1: line grows / stones ignite (camera holds)
-const APPROACH_END = 3.0;    // phase 2: camera eases to the fixed 45闂佺娅ｉ、鍧e
-const ORBIT_DURATION = 3.0;  // phase 3: 360闂佺娅ｉ、鍣恇it (ends at APPROACH_END + ORBIT_DURATION)
-const ORBIT_ANGLE = Math.PI / 4; // fixed 45闂佺娅ｉ悧鐜璫lination to the winning line
+const APPROACH_END = 3.0;    // phase 2: camera eases to the fixed 45 deg cone
+const ORBIT_DURATION = 3.0;  // phase 3: 360 deg orbit (ends at APPROACH_END + ORBIT_DURATION)
+const ORBIT_ANGLE = Math.PI / 4; // fixed 45 deg inclination to the winning line
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 const easeInOutCubic = (t: number) =>
@@ -131,7 +131,7 @@ export function CameraController() {
       h.normalize();
       const v = new THREE.Vector3().crossVectors(dir, h).normalize();
 
-      // Axial lines need the 45闁?cone so the rotation reads clearly; diagonal
+      // Axial lines need the 45 deg cone so the rotation reads clearly; diagonal
       // lines keep the classic plane orbit (better spatial feel).
       const isAxial =
         Math.abs(dir.x) > 0.999 || Math.abs(dir.y) > 0.999 || Math.abs(dir.z) > 0.999;
@@ -173,7 +173,7 @@ export function CameraController() {
           camera.lookAt(mid);
         }
       } else if (!orbitDoneRef.current && t <= APPROACH_END + ORBIT_DURATION) {
-        // Phase 3: 360闂佺娅ｉ、鍣恇it from the 45闂佺娅ｉ、鍧e.
+        // Phase 3: 360 deg orbit from the 45 deg cone.
         const p = easeInOut(Math.min(1, (t - APPROACH_END) / ORBIT_DURATION));
         const angle = p * Math.PI * 2;
         let pos;

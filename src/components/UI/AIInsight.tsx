@@ -17,7 +17,8 @@ export function AIInsight() {
             className="text-white/30 hover:text-white/70 text-xs leading-none px-1"
             aria-label="Close"
           >
-            闂?          </button>
+            ✕
+          </button>
         </div>
         <div className="space-y-2.5 max-h-40 overflow-y-auto pr-1">
           {aiInsights.length === 0 ? (

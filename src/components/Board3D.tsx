@@ -182,7 +182,7 @@ export function Board3D({ onCellSelect }: Board3DProps) {
       {/* All stones always visible; non-previewed layers halved in opacity */}
       {stones.map((stone, idx) => (
         <Stone
-          key={`stone-${idx}`}
+          key={`${stone.position.x},${stone.position.y},${stone.position.z}`}
           position={[stone.position.x - offset, stone.position.y - offset, stone.position.z - offset]}
           player={stone.player}
           opacity={stone.position.z === focusLayer ? 1 : 0.5}

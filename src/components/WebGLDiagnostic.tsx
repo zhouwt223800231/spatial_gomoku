@@ -3,9 +3,9 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 /**
- * 诊断组件：挂在 <Canvas> 内部。
- * 如果渲染管线没有正常出帧，或 WebGL 上下文有问题，就把看到的真实状态
- * 覆盖显示在屏幕上，便于远程定位黑屏原因。
+ * Diagnostic overlay mounted inside <Canvas>.
+ * If the render pipeline produces no frames or the WebGL context is broken,
+ * overlay the real state on screen so black-screen issues are easy to diagnose.
  */
 export function WebGLDiagnostic() {
   const { gl, camera, scene } = useThree();
@@ -16,12 +16,12 @@ export function WebGLDiagnostic() {
     let frames = 0;
     let done = false;
 
-    // 在渲染循环里统计帧数
+    // Count frames in the render loop
     const raf = () => {
       if (done) return;
       frames++;
       if (frames >= 30) {
-        // ~0.5 秒内出了 30 帧 => 渲染正常
+        // 30 frames within ~0.5s => rendering is healthy
         setInfo('Rendering OK: frames streaming');
         done = true;
         return;
@@ -54,7 +54,7 @@ export function WebGLDiagnostic() {
     };
   }, [gl, camera, scene]);
 
-  // 捕获渲染内错误
+  // Capture in-render errors
   useEffect(() => {
     const h = (e: any) => setError((p) => p + '\n[render error] ' + (e?.message || e));
     window.addEventListener('error', h);

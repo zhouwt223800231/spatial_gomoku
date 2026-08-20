@@ -141,6 +141,22 @@ export function getCandidatePositions(stones: StoneData[], boardSize: BoardSize)
   const candidates = new Set<number>();
 
   for (const stone of stones) {
+    // Direction-extension candidates: any empty cell along the 13 winning
+    // directions up to (5 - current run) away, so far cross-layer line starts
+    // are never pruned.
+    for (const dir of DIRECTIONS) {
+      for (let i = 1; i <= 4; i++) {
+        const nx = stone.position.x + dir.x * i;
+        const ny = stone.position.y + dir.y * i;
+        const nz = stone.position.z + dir.z * i;
+        if (nx < 0 || nx >= boardSize || ny < 0 || ny >= boardSize || nz < 0 || nz >= boardSize) break;
+        const k = (nx * boardSize + ny) * boardSize + nz;
+        if (!occupied.has(k)) candidates.add(k);
+        // Stop extending once we hit a friendly stone (the run continues there);
+        // keep going past the far end anyway up to 4 so remote line starts stay.
+      }
+    }
+    // Safety net: classic ±2 neighborhood (nearby defense / double-threat spots).
     for (let dx = -2; dx <= 2; dx++) {
       for (let dy = -2; dy <= 2; dy++) {
         for (let dz = -2; dz <= 2; dz++) {

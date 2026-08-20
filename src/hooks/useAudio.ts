@@ -1,6 +1,10 @@
 import { useCallback, useRef } from 'react';
-import * as Tone from 'tone';
 import { Position } from '../types';
+
+// Tone.js is loaded lazily on the first user gesture so the initial JS bundle
+// stays small (it is split into its own chunk by vite.config.ts manualChunks).
+type ToneModule = typeof import('tone');
+let toneNS: ToneModule | null = null;
 
 // --- Kalimba (Dual Harmonic) constants ---
 // A-major pentatonic, two octaves (A3..A5): distance from board center -> pitch.
@@ -32,36 +36,39 @@ const distancePitch = (pos: Position, boardSize: number): string => {
  * Dual-harmonic kalimba voice (audition preset B):
  * fundamental sine + ~3x harmonic sine + pink pick-noise transient,
  * through a light reverb so the tail rings out naturally.
+ * The Tone namespace is injected so this module never imports Tone eagerly.
  */
 class KalimbaVoice {
-  readonly fund: Tone.Synth;
-  readonly harm: Tone.Synth;
-  readonly noise: Tone.NoiseSynth;
-  readonly noiseGain: Tone.Gain;
-  readonly reverb: Tone.Reverb;
-  readonly master: Tone.Gain;
+  readonly fund: InstanceType<ToneModule['Synth']>;
+  readonly harm: InstanceType<ToneModule['Synth']>;
+  readonly noise: InstanceType<ToneModule['NoiseSynth']>;
+  readonly noiseGain: InstanceType<ToneModule['Gain']>;
+  readonly reverb: InstanceType<ToneModule['Reverb']>;
+  readonly master: InstanceType<ToneModule['Gain']>;
+  private readonly tone: ToneModule;
 
-  constructor() {
-    this.fund = new Tone.Synth({
+  constructor(tone: ToneModule) {
+    this.tone = tone;
+    this.fund = new tone.Synth({
       oscillator: { type: 'sine' },
       envelope: { attack: 0.002, decay: 1.2, sustain: 0, release: 0.96 },
     });
     this.fund.volume.value = -4;
 
-    this.harm = new Tone.Synth({
+    this.harm = new tone.Synth({
       oscillator: { type: 'sine' },
       envelope: { attack: 0.002, decay: 0.84, sustain: 0, release: 0.72 },
     });
     this.harm.volume.value = -14;
 
-    this.noise = new Tone.NoiseSynth({
+    this.noise = new tone.NoiseSynth({
       noise: { type: 'pink' },
       envelope: { attack: 0.001, decay: 0.04, sustain: 0, release: 0.02 },
     });
-    this.noiseGain = new Tone.Gain(0.5);
+    this.noiseGain = new tone.Gain(0.5);
 
-    this.reverb = new Tone.Reverb({ decay: 1.0, wet: 0.2 });
-    this.master = new Tone.Gain(0.6);
+    this.reverb = new tone.Reverb({ decay: 1.0, wet: 0.2 });
+    this.master = new tone.Gain(0.6);
 
     this.fund.connect(this.reverb);
     this.harm.connect(this.reverb);
@@ -79,10 +86,10 @@ class KalimbaVoice {
 
   /** Trigger one kalimba note (fundamental + harmonic + pick transient). */
   play(note: string, decay: number, time?: number) {
-    const t = time ?? Tone.now();
+    const t = time ?? this.tone.now();
     this.setDecay(decay);
     this.fund.triggerAttackRelease(note, decay, t);
-    this.harm.triggerAttackRelease(Tone.Frequency(note).transpose(19).toNote(), decay, t);
+    this.harm.triggerAttackRelease(this.tone.Frequency(note).transpose(19).toNote(), decay, t);
     this.noise.triggerAttackRelease(0.03, t);
   }
 
@@ -103,9 +110,12 @@ export function useAudio() {
 
   const init = useCallback(async () => {
     if (initialized.current) return;
-    await Tone.start();
-    placeKalimbaRef.current = new KalimbaVoice();
-    winKalimbaRef.current = new KalimbaVoice();
+    if (!toneNS) {
+      toneNS = await import('tone');
+    }
+    await toneNS.start();
+    placeKalimbaRef.current = new KalimbaVoice(toneNS);
+    winKalimbaRef.current = new KalimbaVoice(toneNS);
     initialized.current = true;
   }, []);
 
@@ -131,33 +141,37 @@ export function useAudio() {
   // distance to the board center, played in visual order with slow-to-fast rhythm.
   const playVictoryChime = useCallback((positions: Position[], boardSize: number) => {
     const v = winKalimbaRef.current;
-    if (!v) return;
+    if (!v || !toneNS) return;
+    const tone = toneNS;
     const scale = positions.map((p) => distancePitch(p, boardSize));
 
-    Tone.Transport.cancel(0);
+    tone.Transport.cancel(0);
     let at = 0;
     scale.forEach((note, i) => {
       const time = at;
-      Tone.Transport.schedule((t) => {
+      tone.Transport.schedule((t) => {
         v.play(note, VICTORY_DECAY, t);
       }, time);
       at += PLUCK_GAPS[i] ?? 0.4;
     });
 
-    Tone.Transport.stop();
-    Tone.Transport.position = 0;
-    Tone.Transport.start();
+    tone.Transport.stop();
+    tone.Transport.position = 0;
+    tone.Transport.start();
     // Reset only after the last tail + reverb has rung out.
     window.setTimeout(() => {
-      Tone.Transport.stop();
-      Tone.Transport.cancel(0);
+      if (!toneNS) return;
+      tone.Transport.stop();
+      tone.Transport.cancel(0);
     }, PLUCK_STOP_MS);
   }, []);
 
   const cancelVictoryChime = useCallback(() => {
-    Tone.Transport.cancel(0);
-    Tone.Transport.stop();
-    Tone.Transport.position = 0;
+    if (!toneNS) return;
+    const tone = toneNS;
+    tone.Transport.cancel(0);
+    tone.Transport.stop();
+    tone.Transport.position = 0;
   }, []);
 
   const playAlertSound = useCallback(() => {
