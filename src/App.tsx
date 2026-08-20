@@ -375,8 +375,7 @@ export default function App() {
             <div ref={topUiRef} className="pointer-events-auto"><StatusBar /></div>
             <div className="flex-1" />
             <div ref={bottomUiRef} className="pointer-events-auto flex flex-col items-center gap-2">
-              <MobilePreviewPad onMove={moveGhost} onConfirm={confirmPlace} onCancel={cancelPreview} />
-              <BottomBar onToggleDrawer={() => setDrawerOpen(true)} />
+              <MobilePreviewPad onMove={moveGhost} onConfirm={confirmPlace} onCancel={cancelPreview} onToggleDrawer={() => setDrawerOpen(true)} />
             </div>
           </div>
 
