@@ -3,26 +3,26 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 // Timeline (seconds):
-// 0-0.8 freeze -> 0.8-1.1 shatter (explode outward) -> 1.1-2.6 collapse to center
-// -> 2.4-3.4 orbit around core -> 3.2-4.6 halo expand + fade -> 4.4-5.2 fade out.
-const SHATTER_START = 0.8;
-const SHATTER_END = 1.1;
+// 0-0.8 freeze -> 0.8-2.6 collapse along bezier (per-particle birth time)
+// -> 2.4-3.4 gather/orbit around core -> 3.2-4.6 halo expand + fade -> 4.4-5.2 fade out.
+const COLLAPSE_START = 0.8;
 const COLLAPSE_END = 2.6;
 const ORBIT_START = 2.4;
-const ORBIT_END = 3.4;
 const HALO_START = 3.2;
 const END = 4.6;
 
-const PARTICLES_PER_STONE = 14;
+const PARTICLES_PER_STONE = 16;
+const HALO_MAX_RADIUS = 1.4;
 
 interface Particle {
   start: THREE.Vector3;
   ctrl: THREE.Vector3;
   end: THREE.Vector3;
-  delay: number;          // per-particle collapse delay (0..0.4)
+  birth: number;          // seconds after COLLAPSE_START this particle starts
+  speed: number;          // 0..1 progress per second
   size: number;
-  explodeDir: THREE.Vector3; // outward shatter direction
-  orbit: { angle: number; speed: number; radius: number; height: number };
+  haloDir: THREE.Vector3; // pre-computed uniform-ish outward direction
+  orbit: { angle: number; speed: number; radius: number };
   seed: number;
 }
 
@@ -48,7 +48,7 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
     return a.clone().add(b).multiplyScalar(0.5);
   }, [positions, n]);
 
-  // CPU-driven particles: position attribute updated every frame (few dozen).
+  // CPU-driven particles with per-particle lifecycle (no phase jumps).
   const { particles, positionsArray, geometry } = useMemo(() => {
     const list: Particle[] = [];
     const total = n * PARTICLES_PER_STONE;
@@ -58,27 +58,32 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
       const s = new THREE.Vector3(...p);
       const toCenter = centerVec.clone().sub(s);
       for (let k = 0; k < PARTICLES_PER_STONE; k++) {
-        // Random outward shatter direction (biased away from center a bit).
-        const dir = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
-        if (dir.lengthSq() < 0.01) dir.set(0, 1, 0);
-        dir.normalize().add(toCenter.clone().normalize().multiplyScalar(0.4)).normalize();
+        // Outward-first control point: the bezier bulges away from the center
+        // then sweeps in, giving a "shatter then collapse" arc without jumps.
+        const away = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
+        if (away.lengthSq() < 0.01) away.set(0, 1, 0);
+        away.normalize();
+        const ctrl = s.clone()
+          .add(toCenter.clone().multiplyScalar(0.5))
+          .add(away.multiplyScalar(0.5 + Math.random() * 0.7));
 
-        // Arc control point: lift toward center with a random swirl.
-        const perp = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-        const ctrl = s.clone().add(toCenter.clone().multiplyScalar(0.5)).add(perp.multiplyScalar(0.5 + Math.random() * 0.6));
+        // Uniform-ish outward direction for the final halo (precomputed).
+        const hd = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
+        if (hd.lengthSq() < 0.01) hd.set(1, 0, 0);
+        hd.normalize();
 
         list.push({
           start: s.clone(),
           ctrl,
           end: centerVec.clone(),
-          delay: (k / PARTICLES_PER_STONE) * 0.4 + Math.random() * 0.05,
-          size: 0.07 + Math.random() * 0.07,
-          explodeDir: dir,
+          birth: (k / PARTICLES_PER_STONE) * 0.5 + Math.random() * 0.15,
+          speed: 0.55 + Math.random() * 0.5,
+          size: 0.08 + Math.random() * 0.08,
+          haloDir: hd,
           orbit: {
             angle: Math.random() * Math.PI * 2,
-            speed: 2 + Math.random() * 3,
-            radius: 0.12 + Math.random() * 0.22,
-            height: (Math.random() - 0.5) * 0.18,
+            speed: 1.5 + Math.random() * 2.5,
+            radius: 0.08 + Math.random() * 0.12,
           },
           seed: Math.random() * Math.PI * 2,
         });
@@ -94,7 +99,7 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
 
   const mat = useMemo(() => new THREE.PointsMaterial({
     color,
-    size: 0.14,
+    size: 0.13,
     transparent: true,
     opacity: 0,
     depthWrite: false,
@@ -107,98 +112,94 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
     if (startRef.current === null) startRef.current = state.clock.elapsedTime;
     const t = state.clock.elapsedTime - startRef.current;
 
-    const shatter = Math.min(1, Math.max(0, (t - SHATTER_START) / (SHATTER_END - SHATTER_START)));
-    const collapse = Math.min(1, Math.max(0, (t - SHATTER_END) / (COLLAPSE_END - SHATTER_END)));
-    const orbit = Math.min(1, Math.max(0, (t - ORBIT_START) / (ORBIT_END - ORBIT_START)));
+    const collapse = Math.min(1, Math.max(0, (t - COLLAPSE_START) / (COLLAPSE_END - COLLAPSE_START)));
+    const orbit = Math.min(1, Math.max(0, (t - ORBIT_START) / (HALO_START - ORBIT_START)));
     const halo = t >= HALO_START ? Math.min(1, (t - HALO_START) / (END - HALO_START)) : 0;
     const fade = t >= END ? Math.min(1, (t - END) / 0.8) : 0;
 
     const arr = positionsArray;
+    const tmp = new THREE.Vector3();
+
     particles.forEach((p, i) => {
-      const out = new THREE.Vector3();
+      // Per-particle progress along its bezier (ease-in-out).
+      const u = Math.min(1, Math.max(0, (collapse - p.birth) * p.speed));
+      const ease = u * u * (3 - 2 * u);
 
-      // Phase A: shatter - burst outward from the stone.
-      if (shatter > 0 && collapse <= 0) {
-        const e = 0.35 * shatter * shatter;
-        out.copy(p.start).addScaledVector(p.explodeDir, e);
-      } else {
-        // Phase B: bezier collapse toward center (with per-particle delay).
-        const local = Math.min(1, Math.max(0, (collapse - p.delay) / (1 - p.delay || 1)));
-        const b = local * local * (3 - 2 * local); // smoothstep
-        out.copy(p.start)
-          .multiplyScalar((1 - b) * (1 - b))
-          .addScaledVector(p.ctrl, 2 * (1 - b) * b)
-          .addScaledVector(p.end, b * b);
-      }
-
-      // Phase C: orbit around the core (subtle swirl).
-      if (orbit > 0 && halo <= 0) {
-        const a = p.orbit.angle + t * p.orbit.speed;
-        const r = p.orbit.radius * (1 - orbit * 0.4);
-        out.x = p.end.x + Math.cos(a) * r;
-        out.y = p.end.y + p.orbit.height;
-        out.z = p.end.z + Math.sin(a) * r;
-      }
-
-      // Phase D: halo - expand radially outward from the core and fade.
       if (halo > 0) {
-        const dirFrom = out.clone().sub(p.end).normalize();
-        if (dirFrom.lengthSq() < 0.01) dirFrom.set(1, 0, 0);
-        const r = 0.2 + halo * (1.2 + p.seed * 0.4);
-        out.copy(p.end).addScaledVector(dirFrom, r);
+        // Final halo: expand outward along the precomputed direction.
+        const r = 0.15 + halo * HALO_MAX_RADIUS;
+        tmp.copy(p.haloDir).multiplyScalar(r).add(p.end);
+      } else if (u >= 1) {
+        // Gathered near the core: damped micro-orbit (no jump).
+        const orbitT = Math.min(1, orbit + (u - 1) * 0.5);
+        const a = p.orbit.angle + t * p.orbit.speed;
+        const r = p.orbit.radius * (1 - orbitT * 0.6);
+        tmp.set(
+          p.end.x + Math.cos(a) * r,
+          p.end.y + Math.sin(p.seed) * 0.02,
+          p.end.z + Math.sin(a) * r,
+        );
+      } else if (u > 0) {
+        // Bezier arc: start -> ctrl -> end (outward then collapse).
+        const inv = 1 - ease;
+        tmp.copy(p.start).multiplyScalar(inv * inv)
+          .addScaledVector(p.ctrl, 2 * inv * ease)
+          .addScaledVector(p.end, ease * ease);
+      } else {
+        tmp.copy(p.start);
       }
 
-      arr[i * 3] = out.x;
-      arr[i * 3 + 1] = out.y;
-      arr[i * 3 + 2] = out.z;
+      arr[i * 3] = tmp.x;
+      arr[i * 3 + 1] = tmp.y;
+      arr[i * 3 + 2] = tmp.z;
     });
 
     if (posAttrRef.current) posAttrRef.current.needsUpdate = true;
 
-    // Material opacity across phases.
+    // Smooth global alpha.
     if (matRef.current) {
-      if (fade > 0) matRef.current.opacity = 0.9 * (1 - fade);
-      else if (halo > 0) matRef.current.opacity = 0.9 * (1 - halo);
-      else if (orbit > 0) matRef.current.opacity = 0.9;
-      else if (collapse > 0) matRef.current.opacity = 0.95;
-      else if (shatter > 0) matRef.current.opacity = 0.8 * shatter;
-      else matRef.current.opacity = 0;
+      let opacity = 0;
+      if (fade > 0) opacity = 0.9 * (1 - fade);
+      else if (halo > 0) opacity = 0.9 * (1 - halo);
+      else if (collapse > 0) opacity = Math.min(1, collapse * 2) * 0.9;
+      matRef.current.opacity = opacity;
     }
 
-    // Core mesh: appear when particles gather, pulse, then expand & fade in halo.
+    // Core mesh: gather pulse, then expand & fade in halo.
     if (coreRef.current) {
       const m = coreRef.current.material as THREE.MeshBasicMaterial;
-      const gather = Math.min(1, Math.max(0, (t - (COLLAPSE_END - 0.3)) / 0.5));
-      if (gather > 0 && halo <= 0) {
+      if (halo > 0) {
         coreRef.current.visible = true;
-        const pulse = 1 + 0.22 * Math.sin(t * 6);
-        coreRef.current.scale.setScalar(0.3 + 0.12 * pulse);
-        m.opacity = 0.85 * gather * (1 - orbit * 0.3);
-      } else if (halo > 0) {
+        coreRef.current.scale.setScalar(0.3 + halo * 2.4);
+        m.opacity = 0.9 * (1 - halo) * (1 - fade);
+      } else if (uGather(collapse) > 0) {
         coreRef.current.visible = true;
-        const s = 0.3 + halo * 2.2;
-        coreRef.current.scale.setScalar(s);
-        m.opacity = 0.85 * (1 - halo) * (1 - fade);
+        const g = uGather(collapse);
+        coreRef.current.scale.setScalar(0.3 + 0.14 * Math.sin(t * 6) * g);
+        m.opacity = 0.9 * g;
       } else {
         coreRef.current.visible = false;
       }
     }
 
-    // Halo rings: expand outward from the core.
+    // Halo rings.
     haloRingRefs.current.forEach((ring, idx) => {
       if (!ring) return;
       const rm = ring.material as THREE.MeshBasicMaterial;
       if (halo > 0) {
-        const startR = 0.25 + idx * 0.18;
-        const r = startR + halo * 1.4;
+        const r = 0.3 + idx * 0.25 + halo * 1.3;
         ring.scale.setScalar(r);
-        rm.opacity = 0.5 * (1 - halo) * (1 - fade);
+        rm.opacity = 0.45 * (1 - halo) * (1 - fade);
         ring.visible = true;
       } else {
         ring.visible = false;
       }
     });
   });
+
+  // Local helper: gather window shortly before collapse completes.
+  const uGather = (collapse: number) =>
+    Math.min(1, Math.max(0, (collapse - 0.7) / 0.3));
 
   return (
     <group>
