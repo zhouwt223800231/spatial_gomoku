@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { Position, StoneData, BoardSize } from '../types';
+import { getOpenThreats, threatColor } from '../game/threats';
 
 const SIZE = 104;
 const PLOT_LEFT = 24;
@@ -28,14 +29,20 @@ const VIEW_AXES: Record<'xy' | 'xz' | 'yz', ['x' | 'y' | 'z', 'x' | 'y' | 'z']> 
 
 const TICK_TEXT = 'rgba(255,255,255,0.45)';
 
+interface OpenEndMarker {
+  pos: Position;
+  color: string;
+}
+
 interface MiniViewProps {
   axis: 'xy' | 'xz' | 'yz';
   stones: StoneData[];
   boardSize: BoardSize;
   ghost: Position | null;
+  openEnds: OpenEndMarker[];
 }
 
-function MiniView({ axis, stones, boardSize, ghost }: MiniViewProps) {
+function MiniView({ axis, stones, boardSize, ghost, openEnds }: MiniViewProps) {
   const [hAxis, vAxis] = VIEW_AXES[axis];
   const hColor = AXIS_COLORS[hAxis];
   const vColor = AXIS_COLORS[vAxis];
@@ -74,6 +81,20 @@ function MiniView({ axis, stones, boardSize, ghost }: MiniViewProps) {
         {ghost && (
           <circle cx={project(ghost)[0]} cy={project(ghost)[1]} r={5} fill="none" stroke="#67e8f9" strokeWidth="1.6" />
         )}
+
+        {/* open-threat end markers */}
+        {openEnds.map((e, i) => (
+          <circle
+            key={`threat-${i}`}
+            cx={project(e.pos)[0]}
+            cy={project(e.pos)[1]}
+            r={6}
+            fill="none"
+            stroke={e.color}
+            strokeWidth="1.8"
+            className="animate-pulse"
+          />
+        ))}
 
         {/* horizontal axis arrow */}
         <line x1={PLOT_LEFT - 2} y1={PLOT_BOTTOM + 7} x2={PLOT_RIGHT + 5} y2={PLOT_BOTTOM + 7} stroke={hColor} strokeWidth="1" />
@@ -115,15 +136,28 @@ export function ProjectionMinimap() {
   const stones = useGameStore((s) => s.stones);
   const boardSize = useGameStore((s) => s.boardSize);
   const ghost = useGameStore((s) => s.ghostPosition);
+  const threatGuide = useGameStore((s) => s.threatGuide);
+  const gameMode = useGameStore((s) => s.gameMode);
+  const humanPlayer = useGameStore((s) => s.humanPlayer);
+
+  const openEnds = useMemo(() => {
+    if (!threatGuide) return [] as OpenEndMarker[];
+    const markers: OpenEndMarker[] = [];
+    for (const t of getOpenThreats(stones, boardSize)) {
+      const color = threatColor(t.player, gameMode, humanPlayer);
+      for (const p of t.openEnds) markers.push({ pos: p, color });
+    }
+    return markers;
+  }, [threatGuide, stones, boardSize, gameMode, humanPlayer]);
 
   return (
     <div>
       <div className="glass-panel p-4">
         <h3 className="panel-label text-center mb-3">Projections</h3>
         <div className="flex gap-2.5">
-          <MiniView axis="xy" stones={stones} boardSize={boardSize} ghost={ghost} />
-          <MiniView axis="xz" stones={stones} boardSize={boardSize} ghost={ghost} />
-          <MiniView axis="yz" stones={stones} boardSize={boardSize} ghost={ghost} />
+          <MiniView axis="xy" stones={stones} boardSize={boardSize} ghost={ghost} openEnds={openEnds} />
+          <MiniView axis="xz" stones={stones} boardSize={boardSize} ghost={ghost} openEnds={openEnds} />
+          <MiniView axis="yz" stones={stones} boardSize={boardSize} ghost={ghost} openEnds={openEnds} />
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { Position } from '../../types';
 
@@ -52,13 +52,19 @@ export function StatusBar() {
   );
 }
 
-/** Controls: layer switcher, lines/overview/view toggles (collapsible). */
+/** Controls: layer switcher + layer strip, lines/view toggles, visual aids (collapsible). */
 export function ControlsPanel() {
   const {
     activeLayer, boardSize, setActiveLayer, showLines, setShowLines,
     viewMode, setViewMode, requestOverview,
+    layerFocus, setLayerFocus, threatGuide, setThreatGuide, stones,
   } = useGameStore();
   const [showInfo, setShowInfo] = React.useState(false);
+  const layerCounts = React.useMemo(() => {
+    const counts = new Array<number>(boardSize).fill(0);
+    for (const s of stones) counts[s.position.z] += 1;
+    return counts;
+  }, [stones, boardSize]);
   return (
     <div className="glass-panel p-3">
       <button
@@ -83,6 +89,24 @@ export function ControlsPanel() {
               className="glass-button px-2 py-1 text-xs disabled:opacity-30"
             >&#9654;</button>
           </div>
+
+          {/* Layer strip: per-layer stone counts, click to jump */}
+          <div className="flex gap-1.5 pt-1">
+            {layerCounts.map((count, li) => (
+              <button
+                key={li}
+                onClick={() => setActiveLayer(li)}
+                title={`Layer ${li + 1}: ${count} stones`}
+                className={`flex-1 rounded-md border px-1 py-1 text-center transition-all ${
+                  li === activeLayer ? 'bg-cyan-400/20 border-cyan-200/50' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                <span className="block mono-num text-[10px] text-white/70 leading-none">{li + 1}</span>
+                <span className={`block mono-num text-[9px] leading-tight ${count > 0 ? 'text-cyan-200/80' : 'text-white/25'}`}>{count}</span>
+              </button>
+            ))}
+          </div>
+
           <div className="flex gap-2 pt-1">
             <button
               onClick={() => setShowLines(!showLines)}
@@ -98,6 +122,26 @@ export function ControlsPanel() {
               className="flex-1 glass-button px-2 py-1.5 text-xs"
             >
               {viewMode === 'orthographic' ? '3D' : '2D'}
+            </button>
+          </div>
+
+          {/* Visual aids (default off): focus mode + threat guidance */}
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => setLayerFocus(!layerFocus)}
+              className={`flex-1 px-2 py-1.5 rounded-lg border text-xs transition-all ${
+                layerFocus ? 'bg-violet-400/15 border-violet-200/50 text-violet-100' : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
+              }`}
+            >
+              Focus {layerFocus ? 'On' : 'Off'}
+            </button>
+            <button
+              onClick={() => setThreatGuide(!threatGuide)}
+              className={`flex-1 px-2 py-1.5 rounded-lg border text-xs transition-all ${
+                threatGuide ? 'bg-red-400/15 border-red-200/50 text-red-100' : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
+              }`}
+            >
+              Threats {threatGuide ? 'On' : 'Off'}
             </button>
           </div>
         </div>

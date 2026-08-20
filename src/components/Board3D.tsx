@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../store/gameStore';
-import { Position } from '../types';
+import { Position, StoneData } from '../types';
 import { Stone } from './Stone';
 import { GhostStone } from './GhostStone';
 import { VictoryCelebration } from './VictoryCelebration';
@@ -21,7 +21,7 @@ const AXIS_TICK_COLORS: Record<'x' | 'y' | 'z', string> = {
 };
 
 export function Board3D({ onCellSelect }: Board3DProps) {
-  const { stones, boardSize, ghostPosition, winLine, activeLayer, sliceAxis } = useGameStore();
+  const { stones, boardSize, ghostPosition, winLine, activeLayer, sliceAxis, layerFocus, lastMove } = useGameStore();
   const [cursorCell, setCursorCell] = useState<Position | null>(null);
   const offset = (boardSize - 1) / 2;
 
@@ -29,6 +29,15 @@ export function Board3D({ onCellSelect }: Board3DProps) {
 
   // The layer currently being "previewed": the ghost layer when aiming, otherwise the browsed layer.
   const focusLayer = ghostPosition ? ghostPosition.z : activeLayer;
+
+  // Focus mode opacity: the active layer is fully visible, the last move stays
+  // readable, everything else becomes a faint silhouette. Off = current 1 / 0.5.
+  const stoneOpacity = (s: StoneData) => {
+    if (s.position.z === focusLayer) return 1;
+    if (!layerFocus) return 0.5;
+    if (lastMove && s.position.x === lastMove.x && s.position.y === lastMove.y && s.position.z === lastMove.z) return 0.8;
+    return 0.15;
+  };
 
   const pointToCell = (point: THREE.Vector3): Position => ({
     x: clampCell(Math.round(point.x + offset), boardSize - 1),
@@ -185,7 +194,7 @@ export function Board3D({ onCellSelect }: Board3DProps) {
           key={`${stone.position.x},${stone.position.y},${stone.position.z}`}
           position={[stone.position.x - offset, stone.position.y - offset, stone.position.z - offset]}
           player={stone.player}
-          opacity={stone.position.z === focusLayer ? 1 : 0.5}
+          opacity={stoneOpacity(stone)}
         />
       ))}
 

@@ -142,6 +142,10 @@ export default function App() {
       if (key === '0' || key === 'f' || key === 'r') { e.preventDefault(); st.requestOverview(); return; }
       if (key === 'o') { e.preventDefault(); st.setViewMode(st.viewMode === 'orthographic' ? 'perspective' : 'orthographic'); return; }
 
+      // Number keys 1..N jump straight to a layer (desktop).
+      const layerKey = parseInt(key, 10);
+      if (layerKey >= 1 && layerKey <= size) { e.preventDefault(); st.setActiveLayer(layerKey - 1); return; }
+
       const move = moveGhost;
 
       if (KEYMAP.xNeg.includes(key)) { move('x', -1); e.preventDefault(); }

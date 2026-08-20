@@ -18,6 +18,8 @@ interface GameState {
   sliceAxis: SliceAxis;
   viewMode: ViewMode;
   showLines: boolean;
+  layerFocus: boolean;
+  threatGuide: boolean;
   resetViewTick: number;
   aiThinking: boolean;
   aiInsights: AIInsight[];
@@ -38,6 +40,8 @@ interface GameState {
   setSliceAxis: (axis: SliceAxis) => void;
   setViewMode: (mode: ViewMode) => void;
   setShowLines: (show: boolean) => void;
+  setLayerFocus: (show: boolean) => void;
+  setThreatGuide: (show: boolean) => void;
   requestOverview: () => void;
   setWinLine: (line: WinLineData | null) => void;
   setGamePhase: (phase: GamePhase) => void;
@@ -68,6 +72,8 @@ const createInitialState = () => ({
   sliceAxis: 'z' as SliceAxis,
   viewMode: 'perspective' as ViewMode,
   showLines: true,
+  layerFocus: false,
+  threatGuide: false,
   resetViewTick: 0,
   aiThinking: false,
   aiInsights: [] as AIInsight[],
@@ -121,6 +127,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   setSliceAxis: (axis) => set({ sliceAxis: axis }),
   setViewMode: (mode) => set({ viewMode: mode }),
   setShowLines: (show) => set({ showLines: show }),
+  setLayerFocus: (show) => set({ layerFocus: show }),
+  setThreatGuide: (show) => set({ threatGuide: show }),
   requestOverview: () => set((state) => ({ resetViewTick: state.resetViewTick + 1 })),
   setWinLine: (line) => set({ winLine: line }),
   setGamePhase: (phase) => set({ gamePhase: phase }),

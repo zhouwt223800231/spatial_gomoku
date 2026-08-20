@@ -4,6 +4,7 @@ import { StrategyRadar } from './StrategyRadar';
 import { ProjectionMinimap } from '../ProjectionMinimap';
 import { AIInsight } from './AIInsight';
 import { PlayerPanel } from './panels';
+import { ControlsPanel } from './panels';
 
 interface InfoDrawerProps {
   open: boolean;
@@ -24,6 +25,7 @@ export function InfoDrawer({ open, onClose }: InfoDrawerProps) {
           <button onClick={onClose} className="glass-button px-3 py-1 text-xs">关闭 ✕</button>
         </div>
         <PlayerPanel />
+        <ControlsPanel />
         <StrategyRadar />
         <ProjectionMinimap />
         {gameMode === 'ai' && <AIInsight />}
