@@ -6,9 +6,9 @@ import { useGameStore } from '../store/gameStore';
 
 const FREEZE_END = 1.2;      // phase 0: freeze & slow push-in
 const IGNITE_END = 1.8;      // phase 1: line grows / stones ignite (camera holds)
-const APPROACH_END = 3.0;    // phase 2: camera eases to the fixed 45°pose
-const ORBIT_DURATION = 3.0;  // phase 3: 360°orbit (ends at APPROACH_END + ORBIT_DURATION)
-const ORBIT_ANGLE = Math.PI / 4; // fixed 45°inclination to the winning line
+const APPROACH_END = 3.0;    // phase 2: camera eases to the fixed 45鎺硃ose
+const ORBIT_DURATION = 3.0;  // phase 3: 360鎺硂rbit (ends at APPROACH_END + ORBIT_DURATION)
+const ORBIT_ANGLE = Math.PI / 4; // fixed 45鎺砳nclination to the winning line
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 const easeInOutCubic = (t: number) =>
@@ -131,13 +131,17 @@ export function CameraController() {
       h.normalize();
       const v = new THREE.Vector3().crossVectors(dir, h).normalize();
 
-      // 45-degree cone orbit: camera stays on a cone whose axis is the winning
-      // line (view direction is 45° to the line), so the line's projection
-      // visibly rotates through the full 360°.
+      // Axial lines need the 45掳 cone so the rotation reads clearly; diagonal
+      // lines keep the classic plane orbit (better spatial feel).
+      const isAxial =
+        Math.abs(dir.x) > 0.999 || Math.abs(dir.y) > 0.999 || Math.abs(dir.z) > 0.999;
+      const radius = Math.max(lineLen * 0.6 + 3, boardSize * 0.9);
       const coneDir = h.clone().multiplyScalar(Math.sin(ORBIT_ANGLE))
         .add(dir.clone().multiplyScalar(Math.cos(ORBIT_ANGLE)));
-      const radius = Math.max(lineLen * 0.6 + 3, boardSize * 0.9);
-      const orbitStart = mid.clone().add(coneDir.clone().multiplyScalar(radius));
+      const radial = h.clone().multiplyScalar(Math.cos(ORBIT_ANGLE))
+        .add(v.clone().multiplyScalar(Math.sin(ORBIT_ANGLE)));
+      const tangent = new THREE.Vector3().crossVectors(dir, radial).normalize();
+      const orbitStart = mid.clone().add((isAxial ? coneDir : radial).clone().multiplyScalar(radius));
 
       if (controls) controls.enabled = false;
 
@@ -151,7 +155,7 @@ export function CameraController() {
         camera.position.copy(target);
         camera.lookAt(mid);
       } else if (t < APPROACH_END) {
-        // Phase 1 (hold, watch the line grow) + Phase 2 (ease to the 45°pose).
+        // Phase 1 (hold, watch the line grow) + Phase 2 (ease to the 45鎺硃ose).
         if (approachStartPosRef.current === null) {
           approachStartPosRef.current = camera.position.clone();
         }
@@ -159,11 +163,18 @@ export function CameraController() {
         camera.position.lerpVectors(approachStartPosRef.current, orbitStart, p);
         camera.lookAt(mid);
       } else if (!orbitDoneRef.current && t <= APPROACH_END + ORBIT_DURATION) {
-        // Phase 3: 360°orbit from the 45°pose.
+        // Phase 3: 360鎺硂rbit from the 45鎺硃ose.
         const p = easeInOut(Math.min(1, (t - APPROACH_END) / ORBIT_DURATION));
         const angle = p * Math.PI * 2;
-        const q = new THREE.Quaternion().setFromAxisAngle(dir, angle);
-        const pos = mid.clone().add(coneDir.clone().applyQuaternion(q).multiplyScalar(radius));
+        let pos;
+        if (isAxial) {
+          const q = new THREE.Quaternion().setFromAxisAngle(dir, angle);
+          pos = mid.clone().add(coneDir.clone().applyQuaternion(q).multiplyScalar(radius));
+        } else {
+          pos = mid.clone()
+            .add(radial.clone().multiplyScalar(Math.cos(angle) * radius))
+            .add(tangent.clone().multiplyScalar(Math.sin(angle) * radius));
+        }
         camera.position.copy(pos);
         camera.lookAt(mid);
       } else {
