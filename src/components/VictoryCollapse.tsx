@@ -12,16 +12,17 @@ const HALO_START = 3.2;
 const END = 4.6;
 
 const PARTICLES_PER_STONE = 16;
+const TRAIL_LENGTH = 8;      // history points per particle
 const HALO_MAX_RADIUS = 1.4;
 
 interface Particle {
   start: THREE.Vector3;
   ctrl: THREE.Vector3;
   end: THREE.Vector3;
-  birth: number;          // seconds after COLLAPSE_START this particle starts
-  speed: number;          // 0..1 progress per second
+  birth: number;
+  speed: number;
   size: number;
-  haloDir: THREE.Vector3; // pre-computed uniform-ish outward direction
+  haloDir: THREE.Vector3;
   orbit: { angle: number; speed: number; radius: number };
   seed: number;
 }
@@ -31,12 +32,33 @@ interface VictoryCollapseProps {
   player: 'black' | 'white';
 }
 
+/** Soft round sprite so particles look like glowing dust, not squares. */
+function makeSoftSprite(): THREE.Texture {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.35, 'rgba(255,255,255,0.85)');
+  g.addColorStop(0.7, 'rgba(255,255,255,0.25)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+}
+
 export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
   const startRef = useRef<number | null>(null);
   const coreRef = useRef<THREE.Mesh | null>(null);
   const pointsRef = useRef<THREE.Points | null>(null);
   const matRef = useRef<THREE.PointsMaterial | null>(null);
   const posAttrRef = useRef<THREE.BufferAttribute | null>(null);
+  const trailRef = useRef<THREE.LineSegments | null>(null);
+  const trailGeoRef = useRef<THREE.BufferGeometry | null>(null);
   const haloRingRefs = useRef<(THREE.Mesh | null)[]>([]);
 
   const color = player === 'black' ? '#fbbf24' : '#60a5fa';
@@ -48,43 +70,31 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
     return a.clone().add(b).multiplyScalar(0.5);
   }, [positions, n]);
 
-  // CPU-driven particles with per-particle lifecycle (no phase jumps).
-  const { particles, positionsArray, geometry } = useMemo(() => {
+  const { particles, positionsArray, geometry, total } = useMemo(() => {
     const list: Particle[] = [];
-    const total = n * PARTICLES_PER_STONE;
-    const arr = new Float32Array(total * 3);
+    const totalN = n * PARTICLES_PER_STONE;
+    const arr = new Float32Array(totalN * 3);
     let i = 0;
     positions.forEach((p) => {
       const s = new THREE.Vector3(...p);
       const toCenter = centerVec.clone().sub(s);
       for (let k = 0; k < PARTICLES_PER_STONE; k++) {
-        // Outward-first control point: the bezier bulges away from the center
-        // then sweeps in, giving a "shatter then collapse" arc without jumps.
         const away = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
         if (away.lengthSq() < 0.01) away.set(0, 1, 0);
         away.normalize();
-        const ctrl = s.clone()
-          .add(toCenter.clone().multiplyScalar(0.5))
-          .add(away.multiplyScalar(0.5 + Math.random() * 0.7));
-
-        // Uniform-ish outward direction for the final halo (precomputed).
+        const ctrl = s.clone().add(toCenter.clone().multiplyScalar(0.5)).add(away.multiplyScalar(0.5 + Math.random() * 0.7));
         const hd = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
         if (hd.lengthSq() < 0.01) hd.set(1, 0, 0);
         hd.normalize();
-
         list.push({
           start: s.clone(),
           ctrl,
           end: centerVec.clone(),
           birth: (k / PARTICLES_PER_STONE) * 0.5 + Math.random() * 0.15,
           speed: 0.55 + Math.random() * 0.5,
-          size: 0.08 + Math.random() * 0.08,
+          size: 0.07 + Math.random() * 0.06,
           haloDir: hd,
-          orbit: {
-            angle: Math.random() * Math.PI * 2,
-            speed: 1.5 + Math.random() * 2.5,
-            radius: 0.08 + Math.random() * 0.12,
-          },
+          orbit: { angle: Math.random() * Math.PI * 2, speed: 1.5 + Math.random() * 2.5, radius: 0.08 + Math.random() * 0.12 },
           seed: Math.random() * Math.PI * 2,
         });
         arr[i * 3] = s.x; arr[i * 3 + 1] = s.y; arr[i * 3 + 2] = s.z;
@@ -92,21 +102,40 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
       }
     });
     const geo = new THREE.BufferGeometry();
-    const attr = new THREE.BufferAttribute(arr, 3);
-    geo.setAttribute('position', attr);
-    return { particles: list, positionsArray: arr, geometry: geo };
+    geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    return { particles: list, positionsArray: arr, geometry: geo, total: totalN };
   }, [positions, centerVec, n]);
+
+  const sprite = useMemo(() => makeSoftSprite(), []);
 
   const mat = useMemo(() => new THREE.PointsMaterial({
     color,
     size: 0.13,
+    map: sprite,
     transparent: true,
     opacity: 0,
     depthWrite: false,
     depthTest: false,
     blending: THREE.AdditiveBlending,
     sizeAttenuation: true,
-  }), [color]);
+  }), [color, sprite]);
+
+  // Trails: each particle keeps TRAIL_LENGTH history points drawn as lines.
+  const trailData = useMemo(() => {
+    const history = Array.from({ length: total }, () => Array.from({ length: TRAIL_LENGTH }, () => new THREE.Vector3()));
+    const pos = new Float32Array(total * TRAIL_LENGTH * 2 * 3);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const matL = new THREE.LineBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending,
+    });
+    return { history, pos, geo, matL };
+  }, [total, color]);
 
   useFrame((state) => {
     if (startRef.current === null) startRef.current = state.clock.elapsedTime;
@@ -121,26 +150,24 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
     const tmp = new THREE.Vector3();
 
     particles.forEach((p, i) => {
-      // Per-particle progress along its bezier (ease-in-out).
       const u = Math.min(1, Math.max(0, (collapse - p.birth) * p.speed));
       const ease = u * u * (3 - 2 * u);
 
       if (halo > 0) {
-        // Final halo: expand outward along the precomputed direction.
+        // Halo: continue smoothly outward along the precomputed direction
+        // from the gathered position (no jump).
         const r = 0.15 + halo * HALO_MAX_RADIUS;
         tmp.copy(p.haloDir).multiplyScalar(r).add(p.end);
       } else if (u >= 1) {
-        // Gathered near the core: damped micro-orbit (no jump).
-        const orbitT = Math.min(1, orbit + (u - 1) * 0.5);
+        // Gathered near the core: damped micro-orbit.
         const a = p.orbit.angle + t * p.orbit.speed;
-        const r = p.orbit.radius * (1 - orbitT * 0.6);
+        const rr = p.orbit.radius * (1 - orbit * 0.6);
         tmp.set(
-          p.end.x + Math.cos(a) * r,
+          p.end.x + Math.cos(a) * rr,
           p.end.y + Math.sin(p.seed) * 0.02,
-          p.end.z + Math.sin(a) * r,
+          p.end.z + Math.sin(a) * rr,
         );
       } else if (u > 0) {
-        // Bezier arc: start -> ctrl -> end (outward then collapse).
         const inv = 1 - ease;
         tmp.copy(p.start).multiplyScalar(inv * inv)
           .addScaledVector(p.ctrl, 2 * inv * ease)
@@ -149,32 +176,52 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
         tmp.copy(p.start);
       }
 
-      arr[i * 3] = tmp.x;
-      arr[i * 3 + 1] = tmp.y;
-      arr[i * 3 + 2] = tmp.z;
+      arr[i * 3] = tmp.x; arr[i * 3 + 1] = tmp.y; arr[i * 3 + 2] = tmp.z;
+
+      // Shift trail history (drop oldest, push newest).
+      const hist = trailData.history[i];
+      for (let k = TRAIL_LENGTH - 1; k > 0; k--) hist[k].copy(hist[k - 1]);
+      hist[0].copy(tmp);
     });
 
     if (posAttrRef.current) posAttrRef.current.needsUpdate = true;
 
-    // Smooth global alpha.
-    if (matRef.current) {
-      let opacity = 0;
-      if (fade > 0) opacity = 0.9 * (1 - fade);
-      else if (halo > 0) opacity = 0.9 * (1 - halo);
-      else if (collapse > 0) opacity = Math.min(1, collapse * 2) * 0.9;
-      matRef.current.opacity = opacity;
+    // Write trail segments: particle i connects history[k] -> history[k+1].
+    if (trailGeoRef.current) {
+      const tp = trailGeoRef.current.getAttribute('position') as THREE.BufferAttribute;
+      const tarr = tp.array as Float32Array;
+      let ti = 0;
+      for (let i = 0; i < total; i++) {
+        const hist = trailData.history[i];
+        for (let k = 0; k < TRAIL_LENGTH - 1; k++) {
+          const a = hist[k];
+          const b = hist[k + 1];
+          tarr[ti * 3] = a.x; tarr[ti * 3 + 1] = a.y; tarr[ti * 3 + 2] = a.z;
+          tarr[(ti + 1) * 3] = b.x; tarr[(ti + 1) * 3 + 1] = b.y; tarr[(ti + 1) * 3 + 2] = b.z;
+          ti += 2;
+        }
+      }
+      tp.needsUpdate = true;
     }
 
-    // Core mesh: gather pulse, then expand & fade in halo.
+    // Global alpha (points + trails).
+    let opacity = 0;
+    if (fade > 0) opacity = 0.9 * (1 - fade);
+    else if (halo > 0) opacity = 0.9 * (1 - halo);
+    else if (collapse > 0) opacity = Math.min(1, collapse * 2) * 0.9;
+    if (matRef.current) matRef.current.opacity = opacity;
+    trailData.matL.opacity = opacity * 0.35;
+
+    // Core mesh.
     if (coreRef.current) {
       const m = coreRef.current.material as THREE.MeshBasicMaterial;
       if (halo > 0) {
         coreRef.current.visible = true;
         coreRef.current.scale.setScalar(0.3 + halo * 2.4);
         m.opacity = 0.9 * (1 - halo) * (1 - fade);
-      } else if (uGather(collapse) > 0) {
+      } else if (collapse > 0.7) {
         coreRef.current.visible = true;
-        const g = uGather(collapse);
+        const g = Math.min(1, (collapse - 0.7) / 0.3);
         coreRef.current.scale.setScalar(0.3 + 0.14 * Math.sin(t * 6) * g);
         m.opacity = 0.9 * g;
       } else {
@@ -197,13 +244,18 @@ export function VictoryCollapse({ positions, player }: VictoryCollapseProps) {
     });
   });
 
-  // Local helper: gather window shortly before collapse completes.
-  const uGather = (collapse: number) =>
-    Math.min(1, Math.max(0, (collapse - 0.7) / 0.3));
-
   return (
     <group>
       <points ref={pointsRef} geometry={geometry} material={mat} raycast={() => null} />
+      <lineSegments
+        ref={(el) => {
+          trailRef.current = el;
+          trailGeoRef.current = el?.geometry ?? null;
+        }}
+        geometry={trailData.geo}
+        material={trailData.matL}
+        raycast={() => null}
+      />
 
       {/* Star core */}
       <mesh ref={coreRef} position={centerVec} visible={false} raycast={() => null}>
