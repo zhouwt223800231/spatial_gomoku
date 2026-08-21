@@ -24,6 +24,7 @@ import { AIInsight } from './components/UI/AIInsight';
 import { StrategyRadar } from './components/UI/StrategyRadar';
 import { ProjectionMinimap } from './components/ProjectionMinimap';
 import { InfoDrawer } from './components/UI/InfoDrawer';
+import { LoadingScreen } from './components/UI/LoadingScreen';
 
 const KEYMAP: Record<'xNeg' | 'xPos' | 'yNeg' | 'yPos' | 'zNeg' | 'zPos' | 'confirm' | 'cancel', readonly string[]> = {
   xNeg: ['a', 'arrowleft'],
@@ -69,6 +70,9 @@ export default function App() {
   const aiBlocksRef = useRef(0);
   const aiThreatFeaturesRef = useRef<{ feature: ReturnType<typeof computeThreatFeature> }[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [canvasReady, setCanvasReady] = useState(false);
+  const [booted, setBooted] = useState(false);
+  const [started, setStarted] = useState(false);
 
   // Camera instance that actually swaps when viewMode toggles (R3F only
   // replaces its default camera when given an instance or on remount).
@@ -209,6 +213,20 @@ export default function App() {
   }, []);
 
   // Measure the real screen-space occupied by the top status bar and the
+  // Boot gate: wait until fonts + the WebGL canvas are ready (with a safety
+  // timeout) and a minimum display time, then flip to the "click to start" state.
+  useEffect(() => {
+    let cancelled = false;
+    const minDelay = new Promise<void>((r) => setTimeout(r, 1500));
+    const fonts = typeof document !== 'undefined' ? document.fonts.ready.catch(() => {}) : Promise.resolve();
+    const canvasPromise = new Promise<void>((r) => setTimeout(r, canvasReady ? 0 : 4000));
+    const timeout = new Promise<void>((r) => setTimeout(r, 4000));
+    Promise.race([Promise.all([fonts, canvasPromise, minDelay]), timeout]).then(() => {
+      if (!cancelled) setBooted(true);
+    });
+    return () => { cancelled = true; };
+  }, [canvasReady]);
+
   // bottom operation stack so the canvas band can sit exactly between them.
   useEffect(() => {
     const measure = () => {
@@ -372,6 +390,7 @@ export default function App() {
         dpr={[1, 2]}
         orthographic={viewMode === 'orthographic'}
         camera={camera}
+        onCreated={() => setCanvasReady(true)}
         gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
       >
         <fog attach="fog" args={['#0b1020', 10, 30]} />
@@ -388,7 +407,7 @@ export default function App() {
       </Canvas>
       </div>
 
-      {gamePhase === 'menu' && <Menu />}
+{gamePhase === 'menu' && started && <Menu />}
 
       {gamePhase === 'playing' && (
         <>
@@ -471,7 +490,10 @@ export default function App() {
           </div>
         </div>
       )}
+      {!started && <LoadingScreen booted={booted} onStart={() => setStarted(true)} />}
     </div>
   );
 }
+
+
 
