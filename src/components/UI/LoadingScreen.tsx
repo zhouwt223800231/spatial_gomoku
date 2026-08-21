@@ -9,19 +9,18 @@ interface LoadingScreenProps {
 /**
  * Full-screen boot screen: shows a loading state until every component is
  * ready (fonts + WebGL first frame + minimum display time), then a small
- * "click to start" prompt. Clicking triggers the warp-in iris transition:
- * the loading overlay fades/blurs away while a glowing ring expands and the
- * menu is revealed beneath it.
+ * "click to start" prompt. Clicking fades the overlay away while the menu's
+ * title (the same visual element, id="loading-title" / "menu-title") FLIPs
+ * from the center to the menu's left position.
  */
 export function LoadingScreen({ booted, leaving = false, onStart }: LoadingScreenProps) {
   return (
     <div
-      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#070b16]/35 cursor-pointer select-none ${leaving ? 'loading-leaving' : ''}`}
+      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#070b16]/35 cursor-pointer select-none ${leaving ? 'loading-fade-out' : ''}`}
       onClick={booted && !leaving ? onStart : undefined}
     >
-      {leaving && <div className="warp-ring" />}
-
       <h1
+        id="loading-title"
         className="menu-title font-display font-light tracking-wider mb-10"
         style={{ fontSize: 'clamp(2.2rem, 6vw, 4rem)' }}
       >

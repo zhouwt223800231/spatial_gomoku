@@ -75,6 +75,7 @@ export default function App() {
   const [started, setStarted] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [loadingGone, setLoadingGone] = useState(false);
+  const [bootFlip, setBootFlip] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
 
   // Camera instance that actually swaps when viewMode toggles (R3F only
   // replaces its default camera when given an instance or on remount).
@@ -230,9 +231,19 @@ export default function App() {
   }, [canvasReady]);
 
   const handleStart = useCallback(() => {
-    setStarted(true); // mount the menu behind the iris transition
-    setLeaving(true); // loading overlay starts fading + warp ring
-    window.setTimeout(() => setLoadingGone(true), 950); // unmount after the transition
+    // Capture the loading title rect, then let the menu mount behind so its
+    // title FLIPs from the center to the menu's left position.
+    const el = document.getElementById('loading-title');
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setBootFlip({ left: r.left, top: r.top, width: r.width, height: r.height });
+    }
+    setStarted(true);
+    setLeaving(true);
+    window.setTimeout(() => {
+      setLoadingGone(true);
+      setBootFlip(null); // so returning to the menu does not replay the FLIP
+    }, 900);
   }, []);
 
   // bottom operation stack so the canvas band can sit exactly between them.
@@ -415,11 +426,7 @@ export default function App() {
       </Canvas>
       </div>
 
-{gamePhase === 'menu' && started && (
-        <div className={`absolute inset-0 ${loadingGone ? '' : 'iris-open'}`}>
-          <Menu />
-        </div>
-      )}
+{gamePhase === 'menu' && started && <Menu flipFrom={bootFlip} />}
 
       {gamePhase === 'playing' && (
         <>
@@ -506,6 +513,9 @@ export default function App() {
     </div>
   );
 }
+
+
+
 
 
 

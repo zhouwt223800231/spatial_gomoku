@@ -198,40 +198,27 @@
   border-bottom-right-radius: 6px;
 }
 
-
-/* ===== Boot transition: warp-in iris (loading -> main menu) ===== */
-@keyframes iris-open {
-  from { clip-path: circle(0% at 50% 50%); }
-  to { clip-path: circle(141% at 50% 50%); }
+/* ===== Boot transition: title FLIP (loading -> main menu) ===== */
+@keyframes loading-fade-out {
+  to { opacity: 0; }
 }
-.iris-open {
-  animation: iris-open 0.9s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+.loading-fade-out {
+  animation: loading-fade-out 0.35s ease forwards;
 }
 
-@keyframes loading-leaving {
-  to { opacity: 0; filter: blur(8px); }
-}
-.loading-leaving {
-  animation: loading-leaving 0.9s ease forwards;
+/* During the boot FLIP the title keeps its shimmer but no entrance animation
+   (menu-rise) so the measured transform is not overridden. */
+.menu-title--flip {
+  animation: menu-shimmer 7s linear infinite;
 }
 
-@keyframes warp-ring {
-  0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-  65% { opacity: 0.95; }
-  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+/* FLIP keyframe: flies the title from the loading position (CSS vars) to its
+   natural left position. Animations are more reliable than transitions here. */
+@keyframes title-fly {
+  from { transform: translate(var(--fly-x, 0px), var(--fly-y, 0px)) scale(var(--fly-s, 1)); }
+  to { transform: translate(0, 0) scale(1); }
 }
-.warp-ring {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 141vmax;
-  height: 141vmax;
-  border-radius: 9999px;
-  border: 2px solid rgba(103, 232, 249, 0.85);
-  box-shadow:
-    0 0 30px rgba(103, 232, 249, 0.6),
-    0 0 80px rgba(167, 139, 250, 0.45),
-    inset 0 0 30px rgba(103, 232, 249, 0.3);
-  animation: warp-ring 0.9s cubic-bezier(0.65, 0, 0.35, 1) forwards;
-  pointer-events: none;
+.title-fly {
+  transform-origin: top left;
+  animation: title-fly 0.8s cubic-bezier(0.33, 1, 0.68, 1) forwards;
 }

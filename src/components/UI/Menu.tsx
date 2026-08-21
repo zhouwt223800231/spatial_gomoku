@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { BoardSize } from '../../types';
 
@@ -16,17 +16,47 @@ const HELP_ITEMS: Array<[string, string]> = [
   ['O', '透视 / 正交视图切换'],
 ];
 
+export interface MenuProps {
+  /** Screen rect of the loading-screen title to FLIP from (boot transition). */
+  flipFrom?: { left: number; top: number; width: number; height: number } | null;
+}
+
 /**
  * Desktop main menu - "Deep Space Command Deck": a dynamic starfield shows
  * through a light scrim on the left (brand block) and a refined setup console
  * on the right; the how-to-play guide lives behind the bottom-right button.
+ * On the boot transition the title FLIPs in from the loading screen's center
+ * position via a keyframe animation (CSS vars --fly-*), then the class is
+ * removed so the normal shimmer resumes.
  */
-export function Menu() {
+export function Menu({ flipFrom = null }: MenuProps) {
   const {
     setGameMode, startGame, setBoardSize, setHumanPlayer, setAiDifficulty,
     boardSize, humanPlayer, aiDifficulty, gameMode,
   } = useGameStore();
   const [showHelp, setShowHelp] = useState(false);
+
+  // Boot FLIP: decide once at mount whether the title flies in from the
+  // loading screen (later prop changes must not re-trigger it).
+  const useFlip = useRef(Boolean(flipFrom)).current;
+  const titleRef = useRef<HTMLHeadingElement>(null);
+
+  useLayoutEffect(() => {
+    if (!useFlip) return;
+    const el = titleRef.current;
+    if (!el || !flipFrom) return;
+    const rect = el.getBoundingClientRect();
+    const s = flipFrom.width / rect.width;
+    const tx = flipFrom.left - rect.left;
+    const ty = flipFrom.top - rect.top;
+    el.style.setProperty('--fly-x', `${tx}px`);
+    el.style.setProperty('--fly-y', `${ty}px`);
+    el.style.setProperty('--fly-s', String(s));
+    el.classList.add('title-fly');
+    // Remove the class after the keyframe so the shimmer resumes normally.
+    const id = window.setTimeout(() => el.classList.remove('title-fly'), 850);
+    return () => window.clearTimeout(id);
+  }, [useFlip, flipFrom]);
 
   const seg = (active: boolean) =>
     `flex-1 py-2.5 rounded-xl border font-mono text-sm transition-all ${
@@ -50,7 +80,9 @@ export function Menu() {
               <div className="menu-emblem" />
             </div>
             <h1
-              className="menu-title font-display font-light tracking-wider md:whitespace-nowrap"
+              ref={titleRef}
+              id="menu-title"
+              className={`menu-title font-display font-light tracking-wider md:whitespace-nowrap ${useFlip ? 'menu-title--flip' : ''}`}
               style={{ fontSize: 'clamp(2.4rem, 5.5vw, 4.4rem)' }}
             >
               SPATIAL GOMOKU
