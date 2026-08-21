@@ -197,3 +197,41 @@
   border-right: 1px solid rgba(167, 139, 250, 0.7);
   border-bottom-right-radius: 6px;
 }
+
+
+/* ===== Boot transition: warp-in iris (loading -> main menu) ===== */
+@keyframes iris-open {
+  from { clip-path: circle(0% at 50% 50%); }
+  to { clip-path: circle(141% at 50% 50%); }
+}
+.iris-open {
+  animation: iris-open 0.9s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+@keyframes loading-leaving {
+  to { opacity: 0; filter: blur(8px); }
+}
+.loading-leaving {
+  animation: loading-leaving 0.9s ease forwards;
+}
+
+@keyframes warp-ring {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+  65% { opacity: 0.95; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}
+.warp-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 141vmax;
+  height: 141vmax;
+  border-radius: 9999px;
+  border: 2px solid rgba(103, 232, 249, 0.85);
+  box-shadow:
+    0 0 30px rgba(103, 232, 249, 0.6),
+    0 0 80px rgba(167, 139, 250, 0.45),
+    inset 0 0 30px rgba(103, 232, 249, 0.3);
+  animation: warp-ring 0.9s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  pointer-events: none;
+}

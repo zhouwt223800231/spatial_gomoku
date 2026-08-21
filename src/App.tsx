@@ -73,6 +73,8 @@ export default function App() {
   const [canvasReady, setCanvasReady] = useState(false);
   const [booted, setBooted] = useState(false);
   const [started, setStarted] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [loadingGone, setLoadingGone] = useState(false);
 
   // Camera instance that actually swaps when viewMode toggles (R3F only
   // replaces its default camera when given an instance or on remount).
@@ -226,6 +228,12 @@ export default function App() {
     });
     return () => { cancelled = true; };
   }, [canvasReady]);
+
+  const handleStart = useCallback(() => {
+    setStarted(true); // mount the menu behind the iris transition
+    setLeaving(true); // loading overlay starts fading + warp ring
+    window.setTimeout(() => setLoadingGone(true), 950); // unmount after the transition
+  }, []);
 
   // bottom operation stack so the canvas band can sit exactly between them.
   useEffect(() => {
@@ -407,7 +415,11 @@ export default function App() {
       </Canvas>
       </div>
 
-{gamePhase === 'menu' && started && <Menu />}
+{gamePhase === 'menu' && started && (
+        <div className={`absolute inset-0 ${loadingGone ? '' : 'iris-open'}`}>
+          <Menu />
+        </div>
+      )}
 
       {gamePhase === 'playing' && (
         <>
@@ -490,10 +502,11 @@ export default function App() {
           </div>
         </div>
       )}
-      {!started && <LoadingScreen booted={booted} onStart={() => setStarted(true)} />}
+      {!loadingGone && <LoadingScreen booted={booted} leaving={leaving} onStart={handleStart} />}
     </div>
   );
 }
+
 
 
 

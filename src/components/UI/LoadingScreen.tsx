@@ -2,21 +2,25 @@ import React from 'react';
 
 interface LoadingScreenProps {
   booted: boolean;
+  leaving?: boolean;
   onStart: () => void;
 }
 
 /**
  * Full-screen boot screen: shows a loading state until every component is
  * ready (fonts + WebGL first frame + minimum display time), then a small
- * "click to start" prompt. Clicking anywhere starts the main menu and counts
- * as the first user gesture (audio init).
+ * "click to start" prompt. Clicking triggers the warp-in iris transition:
+ * the loading overlay fades/blurs away while a glowing ring expands and the
+ * menu is revealed beneath it.
  */
-export function LoadingScreen({ booted, onStart }: LoadingScreenProps) {
+export function LoadingScreen({ booted, leaving = false, onStart }: LoadingScreenProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#070b16]/35 cursor-pointer select-none"
-      onClick={booted ? onStart : undefined}
+      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#070b16]/35 cursor-pointer select-none ${leaving ? 'loading-leaving' : ''}`}
+      onClick={booted && !leaving ? onStart : undefined}
     >
+      {leaving && <div className="warp-ring" />}
+
       <h1
         className="menu-title font-display font-light tracking-wider mb-10"
         style={{ fontSize: 'clamp(2.2rem, 6vw, 4rem)' }}
